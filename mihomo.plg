@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.2">
+<!ENTITY version   "1.0.3">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,6 +14,11 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.3  修复XML解析错误
+- 修复备份脚本中的特殊字符导致的XML解析错误
+- 简化命令替换语法，避免XML解析问题
+- 改进备份和恢复逻辑的稳定性
+
 1.0.2  改进更新逻辑
 - 添加用户数据备份和恢复机制
 - 更新时自动保护用户配置文件
@@ -41,7 +46,7 @@ echo "正在备份用户数据..."
 
 # 备份用户配置文件
 if [ -d "&plgPATH;" ]; then
-  BACKUP_DIR="/tmp/mihomo-backup-$(date +%s)"
+  BACKUP_DIR="/tmp/mihomo-backup-$$"
   mkdir -p "$BACKUP_DIR"
   
   # 备份配置文件
@@ -49,7 +54,7 @@ if [ -d "&plgPATH;" ]; then
     find "&plgPATH;" -name "*.yaml" -o -name "*.yml" | while read file; do
       if [ -f "$file" ]; then
         cp "$file" "$BACKUP_DIR/"
-        echo "  ✓ 备份配置文件: $(basename "$file")"
+        echo "  ✓ 备份配置文件: $file"
       fi
     done
   fi
@@ -146,7 +151,13 @@ echo "✓ 所有文件已从GitHub下载并安装完成"
 
 # 恢复用户数据
 echo "正在恢复用户数据..."
-BACKUP_DIRS=$(find /tmp -name "mihomo-backup-*" -type d 2>/dev/null | sort -r | head -1)
+BACKUP_DIRS=""
+for dir in /tmp/mihomo-backup-*; do
+  if [ -d "$dir" ]; then
+    BACKUP_DIRS="$dir"
+    break
+  fi
+done
 if [ -n "$BACKUP_DIRS" ] && [ -d "$BACKUP_DIRS" ]; then
   echo "  - 找到备份目录: $BACKUP_DIRS"
   
@@ -155,7 +166,7 @@ if [ -n "$BACKUP_DIRS" ] && [ -d "$BACKUP_DIRS" ]; then
     find "$BACKUP_DIRS" -name "*.yaml" -o -name "*.yml" | while read file; do
       if [ -f "$file" ]; then
         cp "$file" "&plgPATH;/"
-        echo "  ✓ 恢复配置文件: $(basename "$file")"
+        echo "  ✓ 恢复配置文件: $file"
       fi
     done
   fi
