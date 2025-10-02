@@ -4,7 +4,7 @@
 
 ## 技术支持
 
-- **GitHub Issues**：报告问题和功能请求
+- **GitHub Issues**：报告问题和功能请求，电报群内有配置文件可下载，已经测试正常。
 - **Telegram 群组**：[点击加入](https://t.me/+7jcTMePlNVwwZjg1)
 
 ## 功能特点
