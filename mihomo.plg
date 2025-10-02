@@ -44,32 +44,30 @@ echo "正在创建目录结构..."
 mkdir -p &plgPATH;
 mkdir -p &emhttp;/scripts;
 
-# 查找插件文件位置
-PLUGIN_DIR=""
-if [ -d "&sourceDir;" ]; then
-  PLUGIN_DIR="&sourceDir;"
-elif [ -d "/tmp/plugins" ]; then
-  PLUGIN_DIR="/tmp/plugins"
-elif [ -d "/var/tmp/plugins" ]; then
-  PLUGIN_DIR="/var/tmp/plugins"
-else
-  # 尝试从当前脚本位置推断
-  SCRIPT_DIR=$(dirname "$0" 2>/dev/null || echo "")
-  if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR" ]; then
-    PLUGIN_DIR="$SCRIPT_DIR"
-  fi
-fi
+# 检查安装方式并下载必要文件
+echo "正在复制核心文件..."
 
-if [ -n "$PLUGIN_DIR" ] && [ -d "$PLUGIN_DIR" ]; then
-  echo "正在复制核心文件..."
-  echo "  - 插件目录: $PLUGIN_DIR"
+# 检查是否为URL安装（通过检查sourceDir是否存在）
+if [ ! -d "&sourceDir;" ]; then
+  echo "  - 检测到URL安装，正在从GitHub下载文件..."
   
-  # 解压mihomo二进制文件
-  if [ -f "$PLUGIN_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" ]; then
+  # 创建临时下载目录
+  DOWNLOAD_DIR="/tmp/mihomo-download"
+  mkdir -p "$DOWNLOAD_DIR"
+  
+  # GitHub仓库URL
+  GITHUB_BASE="https://raw.githubusercontent.com/wlaosj/easy-mihomo/main"
+  
+  # 下载mihomo核心文件
+  echo "  - 正在下载 mihomo 核心文件..."
+  if wget -q "$GITHUB_BASE/mihomo-linux-amd64-v3-go123-v1.19.14.gz" -O "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz"; then
+    echo "  ✓ mihomo 核心文件下载完成"
+    
+    # 解压mihomo二进制文件
     echo "  - 正在解压 mihomo 核心..."
     MIHOME_TMP="/tmp/mihomo-latest"
     
-    if gunzip -c "$PLUGIN_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
+    if gunzip -c "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
       # 解压成功，复制到目标位置
       cp "$MIHOME_TMP" "/usr/local/bin/mihomo"
       chmod +x "/usr/local/bin/mihomo"
@@ -82,41 +80,77 @@ if [ -n "$PLUGIN_DIR" ] && [ -d "$PLUGIN_DIR" ]; then
       rm -f "$MIHOME_TMP"
       exit 1
     fi
-  elif [ -f "$PLUGIN_DIR/mihomo" ]; then
-    echo "  - 复制 mihomo 二进制文件..."
-    cp "$PLUGIN_DIR/mihomo" "/usr/local/bin/mihomo"
-    chmod +x "/usr/local/bin/mihomo"
-    cp "$PLUGIN_DIR/mihomo" "&plgPATH;/mihomo"
-    echo "  ✓ mihomo 二进制文件已安装"
   else
-    echo "  ❌ 在 $PLUGIN_DIR 中找不到 mihomo 核心文件"
-    echo "  - 目录内容:"
-    ls -la "$PLUGIN_DIR" 2>/dev/null || echo "    无法列出目录内容"
+    echo "  ❌ mihomo 核心文件下载失败"
     exit 1
   fi
   
-  # 配置文件需要用户自己上传，不再自动复制
-  
-  # 解压UI文件
-  if [ -f "$PLUGIN_DIR/ui.tar.gz" ]; then
+  # 下载UI文件
+  echo "  - 正在下载UI文件..."
+  if wget -q "$GITHUB_BASE/ui.tar.gz" -O "$DOWNLOAD_DIR/ui.tar.gz"; then
+    echo "  ✓ UI文件下载完成"
+    
+    # 解压UI文件
     echo "  - 正在解压UI文件（解压有点慢，请耐心等待，切勿关闭安装窗口）..."
     mkdir -p "&plgPATH;/ui"
-    tar -xzf "$PLUGIN_DIR/ui.tar.gz" -C "&plgPATH;/ui"
+    tar -xzf "$DOWNLOAD_DIR/ui.tar.gz" -C "&plgPATH;/ui"
     echo "  ✓ UI文件解压完成"
-  elif [ -d "$PLUGIN_DIR/ui" ]; then
+  else
+    echo "  ❌ UI文件下载失败"
+    exit 1
+  fi
+  
+  # 清理临时文件
+  rm -rf "$DOWNLOAD_DIR"
+  echo "✓ 所有文件已从GitHub下载并安装完成"
+  
+else
+  # 本地安装，使用原有逻辑
+  echo "  - 检测到本地安装，从源目录复制文件..."
+  echo "  - 插件目录: &sourceDir;"
+  
+  # 解压mihomo二进制文件
+  if [ -f "&sourceDir;/mihomo-linux-amd64-v3-go123-v1.19.14.gz" ]; then
+    echo "  - 正在解压 mihomo 核心..."
+    MIHOME_TMP="/tmp/mihomo-latest"
+    
+    if gunzip -c "&sourceDir;/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
+      # 解压成功，复制到目标位置
+      cp "$MIHOME_TMP" "/usr/local/bin/mihomo"
+      chmod +x "/usr/local/bin/mihomo"
+      # 备份到插件目录
+      cp "$MIHOME_TMP" "&plgPATH;/mihomo"
+      rm -f "$MIHOME_TMP"
+      echo "  ✓ mihomo 核心解压并安装完成"
+    else
+      echo "  ❌ mihomo 核心解压失败"
+      rm -f "$MIHOME_TMP"
+      exit 1
+    fi
+  elif [ -f "&sourceDir;/mihomo" ]; then
+    echo "  - 复制 mihomo 二进制文件..."
+    cp "&sourceDir;/mihomo" "/usr/local/bin/mihomo"
+    chmod +x "/usr/local/bin/mihomo"
+    cp "&sourceDir;/mihomo" "&plgPATH;/mihomo"
+    echo "  ✓ mihomo 二进制文件已安装"
+  else
+    echo "  ❌ 在 &sourceDir; 中找不到 mihomo 核心文件"
+    exit 1
+  fi
+  
+  # 解压UI文件
+  if [ -f "&sourceDir;/ui.tar.gz" ]; then
+    echo "  - 正在解压UI文件（解压有点慢，请耐心等待，切勿关闭安装窗口）..."
+    mkdir -p "&plgPATH;/ui"
+    tar -xzf "&sourceDir;/ui.tar.gz" -C "&plgPATH;/ui"
+    echo "  ✓ UI文件解压完成"
+  elif [ -d "&sourceDir;/ui" ]; then
     echo "  - 正在复制UI文件（约11MB，请稍候）..."
-    cp -r "$PLUGIN_DIR/ui" "&plgPATH;/ui"
+    cp -r "&sourceDir;/ui" "&plgPATH;/ui"
     echo "  ✓ UI文件复制完成"
   fi
   
-  echo "✓ 所有文件已从 $PLUGIN_DIR 复制到 &plgPATH;"
-else
-  echo "❌ 找不到插件文件目录"
-  echo "  - 尝试的目录:"
-  echo "    &sourceDir;"
-  echo "    /tmp/plugins"
-  echo "    /var/tmp/plugins"
-  exit 1
+  echo "✓ 所有文件已从 &sourceDir; 复制到 &plgPATH;"
 fi
 </INLINE>
 </FILE>
