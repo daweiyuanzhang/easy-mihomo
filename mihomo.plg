@@ -47,8 +47,8 @@ mkdir -p &emhttp;/scripts;
 # 检查安装方式并下载必要文件
 echo "正在复制核心文件..."
 
-# 检查是否为URL安装（通过检查sourceDir是否存在）
-if [ ! -d "&sourceDir;" ]; then
+# 检查是否为URL安装（通过检查sourceDir中是否有文件）
+if [ ! -d "&sourceDir;" ] || [ ! -f "&sourceDir;/mihomo-linux-amd64-v3-go123-v1.19.14.gz" ]; then
   echo "  - 检测到URL安装，正在从GitHub下载文件..."
   
   # 创建临时下载目录
