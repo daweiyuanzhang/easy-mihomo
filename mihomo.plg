@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.0">
+<!ENTITY version   "1.0.1">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,6 +14,11 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.1  优化更新机制
+- 更新时跳过UI文件下载，避免覆盖用户自定义UI
+- 优化安装流程，减少不必要的文件传输
+- 改进安装完成信息显示
+
 1.0.0  初始版本发布
 - 支持基本的代理功能
 - 集成 Web 管理界面
@@ -81,24 +86,38 @@ else
   exit 1
 fi
 
-# 下载UI文件
-echo "  - 正在下载UI文件..."
-if wget -q "$GITHUB_BASE/ui.tar.gz" -O "$DOWNLOAD_DIR/ui.tar.gz"; then
-  echo "  ✓ UI文件下载完成"
-  
-  # 解压UI文件
-  echo "  - 正在解压UI文件（解压有点慢，请耐心等待，切勿关闭安装窗口）..."
-  mkdir -p "&plgPATH;/ui"
-  tar -xzf "$DOWNLOAD_DIR/ui.tar.gz" -C "&plgPATH;/ui"
-  echo "  ✓ UI文件解压完成"
+# 检查UI文件是否已存在
+UI_DIR="&plgPATH;/ui"
+UI_EXISTS=false
+
+if [ -d "$UI_DIR" ] && [ "$(ls -A "$UI_DIR" 2>/dev/null)" ]; then
+  echo "  - 检测到UI文件已存在，跳过UI下载和解压"
+  UI_EXISTS=true
 else
-  echo "  ❌ UI文件下载失败"
-  exit 1
+  echo "  - 正在下载UI文件..."
+  if wget -q "$GITHUB_BASE/ui.tar.gz" -O "$DOWNLOAD_DIR/ui.tar.gz"; then
+    echo "  ✓ UI文件下载完成"
+    
+    # 解压UI文件
+    echo "  - 正在解压UI文件（解压有点慢，请耐心等待，切勿关闭安装窗口）..."
+    mkdir -p "$UI_DIR"
+    tar -xzf "$DOWNLOAD_DIR/ui.tar.gz" -C "$UI_DIR"
+    echo "  ✓ UI文件解压完成"
+  else
+    echo "  ❌ UI文件下载失败"
+    exit 1
+  fi
 fi
 
 # 清理临时文件
 rm -rf "$DOWNLOAD_DIR"
-echo "✓ 所有文件已从GitHub下载并安装完成"
+
+# 根据UI文件处理情况显示不同的完成信息
+if [ "$UI_EXISTS" = true ]; then
+  echo "✓ 核心文件已更新，UI文件保持不变"
+else
+  echo "✓ 所有文件已从GitHub下载并安装完成"
+fi
 </INLINE>
 </FILE>
 
