@@ -26,9 +26,9 @@
 <FILE Run="/bin/bash">
 <INLINE>
 set -e
-rm -rf &emhttp;
-mkdir -p &emhttp;/scripts
-mkdir -p &plgPATH;
+rm -rf /usr/local/emhttp/plugins/easy-mihomo
+mkdir -p /usr/local/emhttp/plugins/easy-mihomo/scripts
+mkdir -p /boot/config/plugins/easy-mihomo
 </INLINE>
 </FILE>
 
@@ -36,13 +36,13 @@ mkdir -p &plgPATH;
 <FILE Run="/bin/bash">
 <INLINE><![CDATA[
 set -e
-mkdir -p &plgPATH;
-mkdir -p &emhttp;/scripts;
+mkdir -p /boot/config/plugins/easy-mihomo
+mkdir -p /usr/local/emhttp/plugins/easy-mihomo/scripts
 
 # 从源目录复制所有文件
 echo "正在创建目录结构..."
-mkdir -p &plgPATH;
-mkdir -p &emhttp;/scripts;
+mkdir -p /boot/config/plugins/easy-mihomo
+mkdir -p /usr/local/emhttp/plugins/easy-mihomo/scripts
 
 # 从GitHub下载并安装文件
 echo "正在从GitHub下载并安装文件..."
@@ -68,7 +68,7 @@ if wget -q "$GITHUB_BASE/mihomo-linux-amd64-v3-go123-v1.19.14.gz" -O "$DOWNLOAD_
     cp "$MIHOME_TMP" "/usr/local/bin/mihomo"
     chmod +x "/usr/local/bin/mihomo"
     # 备份到插件目录
-    cp "$MIHOME_TMP" "&plgPATH;/mihomo"
+    cp "$MIHOME_TMP" "/boot/config/plugins/easy-mihomo/mihomo"
     rm -f "$MIHOME_TMP"
     echo "  ✓ mihomo 核心解压并安装完成"
   else
@@ -82,7 +82,7 @@ else
 fi
 
 # 检查UI文件是否已存在
-UI_DIR="&plgPATH;/ui"
+UI_DIR="/boot/config/plugins/easy-mihomo/ui"
 UI_EXISTS=false
 
 if [ -d "$UI_DIR" ] && [ "$(ls -A "$UI_DIR" 2>/dev/null)" ]; then
@@ -586,9 +586,9 @@ include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
 <FILE Run="/bin/bash">
 <INLINE>
 set -e
-mkdir -p &emhttp;/scripts;
+mkdir -p /usr/local/emhttp/plugins/easy-mihomo/scripts;
 
-echo "Mihomo plugin installed. Persistent path: &plgPATH;"
+echo "Mihomo plugin installed. Persistent path: /boot/config/plugins/easy-mihomo"
 </INLINE>
 </FILE>
 
@@ -627,8 +627,8 @@ echo "  ✓ 二进制文件已清理"
 
 # 清理插件目录
 echo "  - 清理插件目录..."
-rm -rf &emhttp;
-rm -rf &plgPATH;
+rm -rf /usr/local/emhttp/plugins/easy-mihomo
+rm -rf /boot/config/plugins/easy-mihomo
 echo "  ✓ 插件目录已清理"
 
 # 清理系统覆盖层文件（仅限本插件命名空间）
