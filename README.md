@@ -25,7 +25,7 @@
 2. 点击 **"Install Plugin"**
 3. 输入以下 URL：
    ```
-   https://raw.githubusercontent.com/wlaosj/easy-mihomo/main/mihomo.plg
+   https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg
    ```
 4. 点击 **"Install"** 开始安装
 
