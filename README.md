@@ -2,6 +2,11 @@
 
 一个为 Unraid 系统设计的 Mihomo 代理客户端插件，提供简单易用的 Web 管理界面。
 
+## 技术支持
+
+- **GitHub Issues**：报告问题和功能请求
+- **Telegram 群组**：[点击加入](https://t.me/+7jcTMePlNVwwZjg1)
+
 ## 功能特点
 
 - 🚀 **一键安装**：通过 Unraid 插件系统轻松安装
@@ -109,9 +114,6 @@
 3. 确认卸载，所有相关文件将被清理
 
 ## 技术支持
-
-- **GitHub Issues**：报告问题和功能请求
-- **Telegram 群组**：https://t.me/+7jcTMePlNVwwZjg1
 
 ## 更新日志
 
