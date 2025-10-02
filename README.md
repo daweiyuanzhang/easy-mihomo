@@ -25,7 +25,7 @@
 2. 点击 **"Install Plugin"**
 3. 输入以下 URL：
    ```
-   https://raw.githubusercontent.com/您的用户名/easy-mihomo/main/mihomo.plg
+   https://raw.githubusercontent.com/wlaosj/easy-mihomo/main/mihomo.plg
    ```
 4. 点击 **"Install"** 开始安装
 
@@ -122,6 +122,7 @@
 - 支持开机自启动
 - 支持多配置文件管理
 - 支持在线编辑配置
+- 内置 mihomo v1.19.14 核心
 
 ---
 
