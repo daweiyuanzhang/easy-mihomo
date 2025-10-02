@@ -4,8 +4,8 @@
 <!ENTITY author    "隔壁小王">
 <!ENTITY version   "1.0.0">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
-<!ENTITY sourceDir "/boot/config/plugins/install_mihomo">
-<!ENTITY pluginURL "local">
+<!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
+<!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/main/mihomo.plg">
 <!ENTITY plgPATH   "/boot/config/plugins/&name;">
 <!ENTITY plgNAME   "&name;-&version;-x86_64">
 <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
@@ -47,15 +47,33 @@ mkdir -p &emhttp;/scripts;
 if [ -d "&sourceDir;" ]; then
   echo "正在复制核心文件..."
   
-  # 复制mihomo二进制文件到支持权限的位置
-  if [ -f "&sourceDir;/mihomo" ]; then
+  # 解压mihomo二进制文件
+  if [ -f "&sourceDir;/mihomo-linux-amd64-v3-go123-v1.19.14.gz" ]; then
+    echo "  - 正在解压 mihomo 核心..."
+    MIHOME_TMP="/tmp/mihomo-latest"
+    
+    if gunzip -c "&sourceDir;/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
+      # 解压成功，复制到目标位置
+      cp "$MIHOME_TMP" "/usr/local/bin/mihomo"
+      chmod +x "/usr/local/bin/mihomo"
+      # 备份到插件目录
+      cp "$MIHOME_TMP" "&plgPATH;/mihomo"
+      rm -f "$MIHOME_TMP"
+      echo "  ✓ mihomo 核心解压并安装完成"
+    else
+      echo "  ❌ mihomo 核心解压失败"
+      rm -f "$MIHOME_TMP"
+      exit 1
+    fi
+  elif [ -f "&sourceDir;/mihomo" ]; then
     echo "  - 复制 mihomo 二进制文件..."
-    # 在vfat文件系统上保留备份
-    cp "&sourceDir;/mihomo" "&plgPATH;/mihomo"
-    # 复制到支持权限的位置
     cp "&sourceDir;/mihomo" "/usr/local/bin/mihomo"
     chmod +x "/usr/local/bin/mihomo"
+    cp "&sourceDir;/mihomo" "&plgPATH;/mihomo"
     echo "  ✓ mihomo 二进制文件已安装"
+  else
+    echo "  ❌ 找不到 mihomo 核心文件"
+    exit 1
   fi
   
   # 配置文件需要用户自己上传，不再自动复制
