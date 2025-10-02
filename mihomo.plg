@@ -15,6 +15,9 @@
 
 <CHANGES>
 1.0.1  修复插件路径问题
+- 修复CDATA中的实体引用问题
+- 更新时自动停止mihomo服务
+- 强制覆盖现有二进制文件
 
 1.0.0  初始版本发布
 - 支持基本的代理功能
@@ -46,6 +49,16 @@ echo "正在创建目录结构..."
 mkdir -p /boot/config/plugins/easy-mihomo
 mkdir -p /usr/local/emhttp/plugins/easy-mihomo/scripts
 
+# 停止正在运行的mihomo服务
+echo "正在停止mihomo服务..."
+if pgrep -x mihomo >/dev/null 2>&1; then
+  pkill -x mihomo 2>/dev/null || true
+  sleep 2
+  echo "  ✓ mihomo服务已停止"
+else
+  echo "  ✓ mihomo服务未运行"
+fi
+
 # 从GitHub下载并安装文件
 echo "正在从GitHub下载并安装文件..."
 
@@ -67,10 +80,14 @@ if wget -q "$GITHUB_BASE/mihomo-linux-amd64-v3-go123-v1.19.14.gz" -O "$DOWNLOAD_
   
   if gunzip -c "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
     # 解压成功，复制到目标位置
-    cp "$MIHOME_TMP" "/usr/local/bin/mihomo"
+    # 确保目标目录存在
+    mkdir -p /usr/local/bin
+    # 强制覆盖现有文件
+    cp -f "$MIHOME_TMP" "/usr/local/bin/mihomo"
     chmod +x "/usr/local/bin/mihomo"
     # 备份到插件目录
-    cp "$MIHOME_TMP" "/boot/config/plugins/easy-mihomo/mihomo"
+    mkdir -p /boot/config/plugins/easy-mihomo
+    cp -f "$MIHOME_TMP" "/boot/config/plugins/easy-mihomo/mihomo"
     rm -f "$MIHOME_TMP"
     echo "  ✓ mihomo 核心解压并安装完成"
   else
