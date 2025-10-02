@@ -1,19 +1,24 @@
-<?xml version='1.0' standalone='yes'?>
-<!DOCTYPE PLUGIN [
-<!ENTITY name      "easy-mihomo">
-<!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.3">
-<!ENTITY launch    "Settings/EasyMihomo.Main">
-<!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
-<!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
-<!ENTITY plgPATH   "/boot/config/plugins/&name;">
-<!ENTITY plgNAME   "&name;-&version;-x86_64">
-<!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
-]>
+  <?xml version='1.0' standalone='yes'?>
+  <!DOCTYPE PLUGIN [
+  <!ENTITY name      "easy-mihomo">
+  <!ENTITY author    "隔壁小王">
+  <!ENTITY version   "1.0.4">
+  <!ENTITY launch    "Settings/EasyMihomo.Main">
+  <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
+  <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
+  <!ENTITY plgPATH   "/boot/config/plugins/&name;">
+  <!ENTITY plgNAME   "&name;-&version;-x86_64">
+  <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
+  ]>
 
-<PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
+  <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.4  修复XML解析错误
+- 修复备份目录命名中的特殊字符问题
+- 简化备份目录命名，避免XML解析冲突
+- 提高插件安装的稳定性
+
 1.0.3  修复XML解析错误
 - 修复备份脚本中的特殊字符导致的XML解析错误
 - 简化命令替换语法，避免XML解析问题
@@ -38,701 +43,701 @@
 - 支持在线编辑配置
 </CHANGES>
 
-<!-- pre-install: backup user data before update -->
-<FILE Run="/bin/bash">
-<INLINE>
-set -e
-echo "正在备份用户数据..."
+  <!-- pre-install: backup user data before update -->
+  <FILE Run="/bin/bash">
+  <INLINE>
+  set -e
+  echo "正在备份用户数据..."
 
-# 备份用户配置文件
-if [ -d "&plgPATH;" ]; then
-  BACKUP_DIR="/tmp/mihomo-backup-$$"
-  mkdir -p "$BACKUP_DIR"
-  
-  # 备份配置文件
+  # 备份用户配置文件
   if [ -d "&plgPATH;" ]; then
-    find "&plgPATH;" -name "*.yaml" -o -name "*.yml" | while read file; do
-      if [ -f "$file" ]; then
-        cp "$file" "$BACKUP_DIR/"
-        echo "  ✓ 备份配置文件: $file"
-      fi
-    done
+    BACKUP_DIR="/tmp/mihomo-backup"
+    mkdir -p "$BACKUP_DIR"
+    
+    # 备份配置文件
+    if [ -d "&plgPATH;" ]; then
+      find "&plgPATH;" -name "*.yaml" -o -name "*.yml" | while read file; do
+        if [ -f "$file" ]; then
+          cp "$file" "$BACKUP_DIR/"
+          echo "  ✓ 备份配置文件: $file"
+        fi
+      done
+    fi
+    
+    # 备份选择文件
+    if [ -f "&plgPATH;/selected.conf" ]; then
+      cp "&plgPATH;/selected.conf" "$BACKUP_DIR/"
+      echo "  ✓ 备份配置选择文件"
+    fi
+    
+    # 备份开机启动标志
+    if [ -f "&plgPATH;/bootstart.enabled" ]; then
+      cp "&plgPATH;/bootstart.enabled" "$BACKUP_DIR/"
+      echo "  ✓ 备份开机启动设置"
+    fi
+    
+    echo "  ✓ 用户数据备份完成: $BACKUP_DIR"
   fi
-  
-  # 备份选择文件
-  if [ -f "&plgPATH;/selected.conf" ]; then
-    cp "&plgPATH;/selected.conf" "$BACKUP_DIR/"
-    echo "  ✓ 备份配置选择文件"
-  fi
-  
-  # 备份开机启动标志
-  if [ -f "&plgPATH;/bootstart.enabled" ]; then
-    cp "&plgPATH;/bootstart.enabled" "$BACKUP_DIR/"
-    echo "  ✓ 备份开机启动设置"
-  fi
-  
-  echo "  ✓ 用户数据备份完成: $BACKUP_DIR"
-fi
 
-# 清理旧文件
-rm -rf &emhttp;
-mkdir -p &emhttp;/scripts
-mkdir -p &plgPATH;
-</INLINE>
-</FILE>
+  # 清理旧文件
+  rm -rf &emhttp;
+  mkdir -p &emhttp;/scripts
+  mkdir -p &plgPATH;
+  </INLINE>
+  </FILE>
 
-<!-- copy files from source directory -->
-<FILE Run="/bin/bash">
-<INLINE>
-set -e
-mkdir -p &plgPATH;
-mkdir -p &emhttp;/scripts;
+  <!-- copy files from source directory -->
+  <FILE Run="/bin/bash">
+  <INLINE>
+  set -e
+  mkdir -p &plgPATH;
+  mkdir -p &emhttp;/scripts;
 
-# 从源目录复制所有文件
-echo "正在创建目录结构..."
-mkdir -p &plgPATH;
-mkdir -p &emhttp;/scripts;
+  # 从源目录复制所有文件
+  echo "正在创建目录结构..."
+  mkdir -p &plgPATH;
+  mkdir -p &emhttp;/scripts;
 
-# 从GitHub下载并安装文件
-echo "正在从GitHub下载并安装文件..."
+  # 从GitHub下载并安装文件
+  echo "正在从GitHub下载并安装文件..."
 
-# 创建临时下载目录
-DOWNLOAD_DIR="/tmp/mihomo-download"
-mkdir -p "$DOWNLOAD_DIR"
+  # 创建临时下载目录
+  DOWNLOAD_DIR="/tmp/mihomo-download"
+  mkdir -p "$DOWNLOAD_DIR"
 
-# GitHub仓库URL
-GITHUB_BASE="https://raw.githubusercontent.com/wlaosj/easy-mihomo/main"
+  # GitHub仓库URL
+  GITHUB_BASE="https://raw.githubusercontent.com/wlaosj/easy-mihomo/main"
 
-# 下载mihomo核心文件
-echo "  - 正在下载 mihomo 核心文件..."
-if wget -q "$GITHUB_BASE/mihomo-linux-amd64-v3-go123-v1.19.14.gz" -O "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz"; then
-  echo "  ✓ mihomo 核心文件下载完成"
-  
-  # 解压mihomo二进制文件
-  echo "  - 正在解压 mihomo 核心..."
-  MIHOME_TMP="/tmp/mihomo-latest"
-  
-  if gunzip -c "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
-    # 解压成功，复制到目标位置
-    cp "$MIHOME_TMP" "/usr/local/bin/mihomo"
-    chmod +x "/usr/local/bin/mihomo"
-    # 备份到插件目录
-    cp "$MIHOME_TMP" "&plgPATH;/mihomo"
-    rm -f "$MIHOME_TMP"
-    echo "  ✓ mihomo 核心解压并安装完成"
+  # 下载mihomo核心文件
+  echo "  - 正在下载 mihomo 核心文件..."
+  if wget -q "$GITHUB_BASE/mihomo-linux-amd64-v3-go123-v1.19.14.gz" -O "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz"; then
+    echo "  ✓ mihomo 核心文件下载完成"
+    
+    # 解压mihomo二进制文件
+    echo "  - 正在解压 mihomo 核心..."
+    MIHOME_TMP="/tmp/mihomo-latest"
+    
+    if gunzip -c "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
+      # 解压成功，复制到目标位置
+      cp "$MIHOME_TMP" "/usr/local/bin/mihomo"
+      chmod +x "/usr/local/bin/mihomo"
+      # 备份到插件目录
+      cp "$MIHOME_TMP" "&plgPATH;/mihomo"
+      rm -f "$MIHOME_TMP"
+      echo "  ✓ mihomo 核心解压并安装完成"
+    else
+      echo "  ❌ mihomo 核心解压失败"
+      rm -f "$MIHOME_TMP"
+      exit 1
+    fi
   else
-    echo "  ❌ mihomo 核心解压失败"
-    rm -f "$MIHOME_TMP"
+    echo "  ❌ mihomo 核心文件下载失败"
     exit 1
   fi
-else
-  echo "  ❌ mihomo 核心文件下载失败"
-  exit 1
-fi
 
-# 下载UI文件
-echo "  - 正在下载UI文件..."
-if wget -q "$GITHUB_BASE/ui.tar.gz" -O "$DOWNLOAD_DIR/ui.tar.gz"; then
-  echo "  ✓ UI文件下载完成"
-  
-  # 解压UI文件
-  echo "  - 正在解压UI文件（解压有点慢，请耐心等待，切勿关闭安装窗口）..."
-  mkdir -p "&plgPATH;/ui"
-  tar -xzf "$DOWNLOAD_DIR/ui.tar.gz" -C "&plgPATH;/ui"
-  echo "  ✓ UI文件解压完成"
-else
-  echo "  ❌ UI文件下载失败"
-  exit 1
-fi
-
-# 清理临时文件
-rm -rf "$DOWNLOAD_DIR"
-echo "✓ 所有文件已从GitHub下载并安装完成"
-
-# 恢复用户数据
-echo "正在恢复用户数据..."
-BACKUP_DIRS=""
-for dir in /tmp/mihomo-backup-*; do
-  if [ -d "$dir" ]; then
-    BACKUP_DIRS="$dir"
-    break
-  fi
-done
-if [ -n "$BACKUP_DIRS" ] && [ -d "$BACKUP_DIRS" ]; then
-  echo "  - 找到备份目录: $BACKUP_DIRS"
-  
-  # 恢复配置文件
-  if [ -d "$BACKUP_DIRS" ]; then
-    find "$BACKUP_DIRS" -name "*.yaml" -o -name "*.yml" | while read file; do
-      if [ -f "$file" ]; then
-        cp "$file" "&plgPATH;/"
-        echo "  ✓ 恢复配置文件: $file"
-      fi
-    done
-  fi
-  
-  # 恢复选择文件
-  if [ -f "$BACKUP_DIRS/selected.conf" ]; then
-    cp "$BACKUP_DIRS/selected.conf" "&plgPATH;/"
-    echo "  ✓ 恢复配置选择文件"
-  fi
-  
-  # 恢复开机启动标志
-  if [ -f "$BACKUP_DIRS/bootstart.enabled" ]; then
-    cp "$BACKUP_DIRS/bootstart.enabled" "&plgPATH;/"
-    echo "  ✓ 恢复开机启动设置"
-  fi
-  
-  # 清理备份目录
-  rm -rf "$BACKUP_DIRS"
-  echo "  ✓ 用户数据恢复完成"
-else
-  echo "  ℹ️ 未找到备份数据，跳过恢复"
-fi
-</INLINE>
-</FILE>
-
-<!-- WebUI index -->
-<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/index.php">
-<INLINE><![CDATA[
-<?php
-$baseRun = '/usr/local/emhttp/plugins/easy-mihomo';
-$scripts = $baseRun . '/scripts';
-$logFile = '/var/log/mihomo.log';
-$binUsb  = '/boot/config/plugins/easy-mihomo/mihomo';
-$confDir = '/boot/config/plugins/easy-mihomo';
-$selectFile = $confDir . '/selected.conf';
-
-// 预先解析已选择的配置，供后续 saveconf 与渲染使用
-$selectedName = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
-$selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($confDir . '/' . $selectedName) : '';
-
-$cmd = isset($_POST['cmd']) ? $_POST['cmd'] : (isset($_GET['cmd']) ? $_GET['cmd'] : '');
-$msg = '';
-if ($cmd === 'start') {
-  $out = shell_exec("bash $scripts/start.sh 2>&1");
-  $msg = htmlspecialchars($out ?? '');
-}
-if ($cmd === 'stop') {
-  $out = shell_exec("bash $scripts/stop.sh 2>&1");
-  $msg = htmlspecialchars($out ?? '');
-}
-if ($cmd === 'restart') {
-  $out = shell_exec("bash $scripts/restart.sh 2>&1");
-  $msg = htmlspecialchars($out ?? '');
-}
-if ($cmd === 'clearlog') {
-  @file_put_contents($logFile, "");
-  $msg = '日志已清空';
-}
-if ($cmd === 'select_conf') {
-  $name = basename($_POST['name'] ?? '');
-  if ($name === '' || !preg_match('/\.(ya?ml)$/i', $name)) {
-    $msg = '无效的选择';
-  } else {
-    $path = $confDir . '/' . $name;
-    if (is_file($path)) {
-      if (@file_put_contents($selectFile, $name) !== false) {
-        $msg = '已选择配置：' . htmlspecialchars($name);
-      } else {
-        $msg = '保存选择失败';
-      }
-    } else {
-      $msg = '文件不存在';
-    }
-  }
-}
-// 上传功能已移除，请手动上传配置文件到插件目录
-$maxSize = 1024*1024; // 1MB
-if ($cmd === 'saveconf') {
-  $content = $_POST['content'] ?? '';
-  if ($content === '') {
-    $msg = '内容为空';
-  } else if (strlen($content) > $maxSize) {
-    $msg = '内容过大（>1MB）';
-  } else {
-    if (!$selectedPath) {
-      $msg = '未选择配置，请先在页面中选择';
-    } else {
-      if (!is_dir(dirname($selectedPath))) @mkdir(dirname($selectedPath), 0777, true);
-      if (@file_put_contents($selectedPath, $content) !== false) {
-        $msg = '配置已保存：' . htmlspecialchars($selectedPath);
-        $shouldRestart = isset($_POST['restart']) && $_POST['restart'] === '1';
-        if ($shouldRestart) {
-          $out = shell_exec("bash $scripts/restart.sh 2>&1");
-          $msg .= '，并已重启服务';
-          if (!empty($out)) $msg .= ': ' . htmlspecialchars($out);
-        }
-      } else {
-        $msg = '保存失败';
-      }
-    }
-  }
-}
-$status = shell_exec("bash $scripts/status.sh 2>&1");
-$version = shell_exec("bash $scripts/version.sh 2>&1");
-$logTail = file_exists($logFile) ? trim(shell_exec("tail -n 200 $logFile 2>&1")) : '';
-
-// 处理上传重定向返回的消息
-if (isset($_GET['uploadmsg']) && $_GET['uploadmsg'] !== '') {
-  $msg = $_GET['uploadmsg'];
-}
-// 仅在输出 HTML 前设置内容类型，避免影响上传重定向
-header('Content-Type: text/html; charset=utf-8');
-
-$confText = ($selectedPath && file_exists($selectedPath)) ? @file_get_contents($selectedPath) : '';
-$available = array_values(array_filter(scandir($confDir) ?: [], function($f) use ($confDir){
-  return is_file($confDir . '/' . $f) && preg_match('/\.(ya?ml)$/i', $f);
-}));
-
-// 开机即启动（不依赖阵列）设置
-$bootFlag = '/boot/config/plugins/easy-mihomo/bootstart.enabled';
-if ($cmd === 'set_bootstart') {
-  $enable = ($_POST['enable'] ?? '') === '1';
-  $goPath = '/boot/config/go';
-  $begin = "# BEGIN easy-mihomo (do not edit)";
-  $end   = "# END easy-mihomo";
-  $block = $begin . "\n" .
-    "(\n" .
-    "cat <<'EOF' >/tmp/easy-mihomo-boot.sh\n" .
-    "#!/bin/bash\n" .
-    "FLAG=\"/boot/config/plugins/easy-mihomo/bootstart.enabled\"\n" .
-    "START_SH=\"/usr/local/emhttp/plugins/easy-mihomo/scripts/start.sh\"\n" .
-    "LOG=\"/var/log/mihomo.log\"\n" .
-    "for i in \$(seq 1 60); do\n" .
-    "  if [ -x \"\$START_SH\" ]; then break; fi\n" .
-    "  sleep 1\n" .
-    "done\n" .
-    "if [ -f \"\$FLAG\" ] && [ -x \"\$START_SH\" ]; then\n" .
-    "  echo \"[easy-mihomo] boot detected, starting service...\" >> \"\$LOG\" 2>&1\n" .
-    "  bash \"\$START_SH\" >> \"\$LOG\" 2>&1 || true\n" .
-    "fi\n" .
-    "rm -f /tmp/easy-mihomo-boot.sh\n" .
-    "EOF\n" .
-    "bash /tmp/easy-mihomo-boot.sh &\n" .
-    ")\n" .
-    $end . "\n";
-
-  if ($enable) {
-    if (!is_dir(dirname($bootFlag))) @mkdir(dirname($bootFlag), 0777, true);
-    @file_put_contents($bootFlag, 'enabled');
-    $go = file_exists($goPath) ? @file_get_contents($goPath) : "";
-    if (strpos($go, $begin) !== false && strpos($go, $end) !== false) {
-      $pattern = sprintf('/%s[\s\S]*?%s\n?/m', preg_quote($begin, '/'), preg_quote($end, '/'));
-      $go = preg_replace($pattern, $block, $go, 1);
-    } else {
-      if ($go !== "" && substr($go, -1) !== "\n") $go .= "\n";
-      $go .= $block;
-    }
-    @file_put_contents($goPath, $go);
-    $msg = 'bootstart enabled (go injected)';
-  } else {
-    @unlink($bootFlag);
-    $go = file_exists($goPath) ? @file_get_contents($goPath) : "";
-    if ($go !== "") {
-      $pattern = sprintf('/%s[\s\S]*?%s\n?/m', preg_quote($begin, '/'), preg_quote($end, '/'));
-      $newGo = preg_replace($pattern, '', $go, 1);
-      if ($newGo !== null) @file_put_contents($goPath, $newGo);
-    }
-    $msg = 'bootstart disabled (go cleaned)';
-  }
-}
-$bootstartOn = file_exists($bootFlag);
-
-// 检查安装状态
-$installStatus = '';
-$binExists = file_exists('/usr/local/bin/mihomo');
-$uiExists = is_dir('/boot/config/plugins/easy-mihomo/ui');
-
-// 检查插件目录下是否有任何配置文件
-$confDir = '/boot/config/plugins/easy-mihomo';
-$confExists = false;
-if (is_dir($confDir)) {
-  $files = scandir($confDir);
-  foreach ($files as $file) {
-    if (preg_match('/\.(ya?ml)$/i', $file)) {
-      $confExists = true;
-      break;
-    }
-  }
-}
-
-// 只检查核心组件，配置文件由用户自己上传
-if (!$binExists) {
-  $installStatus = '<div class="error">❌ 缺少二进制文件，请重新安装插件</div>';
-} elseif (!$uiExists) {
-  $installStatus = '<div class="warning">⚠️ 缺少UI文件，部分功能可能不可用</div>';
-} elseif (!$confExists) {
-  $installStatus = '<div class="success">💡 请上传配置文件到插件目录，或使用下方文件管理器</div>';
-}
-?>
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>Easy-Mihomo</title>
-<style>
-body{font-family:Arial,Helvetica,sans-serif;margin:16px;color:#222}
-.card{border:1px solid #ddd;border-radius:8px;padding:16px;margin-bottom:16px}
-pre{background:#f7f7f7;border:1px solid #eee;border-radius:6px;padding:10px;max-height:360px;overflow:auto}
-button{padding:8px 14px;margin-right:8px;cursor:pointer}
-input[type=file]{margin-top:8px;margin-bottom:8px}
-.warning{background:#fff3cd;border:1px solid #ffeaa7;color:#856404;padding:12px;border-radius:6px;margin-bottom:16px}
-.error{color:#dc3545;margin:4px 0;font-size:14px}
-.success{color:#28a745;margin:4px 0;font-size:14px}
-</style>
-<script>
-function executeAction(action) {
-  // 使用GET参数直接跳转
-  var url = new URL(window.location);
-  url.searchParams.set('cmd', action);
-  window.location.href = url.toString();
-}
-
-function openConsole() {
-  // 获取当前页面的主机名（不包含端口）
-  var currentHostname = window.location.hostname;
-  var consoleUrl = 'http://' + currentHostname + ':9090/ui/zashboard/#/proxies';
-  // 在新标签页中打开控制台
-  window.open(consoleUrl, '_blank');
-}
-
-function openFileManager() {
-  // 获取当前页面的主机名和端口
-  var currentHostname = window.location.hostname;
-  var currentPort = window.location.port;
-  // 构建文件管理器URL，直接定位到插件配置目录
-  var fileManagerUrl = 'http://' + currentHostname + ':' + currentPort + '/Main/Browse?dir=%2Fboot%2Fconfig%2Fplugins%2Feasy-mihomo';
-  // 在新标签页中打开文件管理器
-  window.open(fileManagerUrl, '_blank');
-}
-
-// 使用浏览器原生表单提交，确保 emhttp 正常接收带 Content-Length 的上传
-</script>
-</head>
-<body>
-<h2>Mihomo 管理</h2>
-<?php if ($installStatus) { echo $installStatus; } ?>
-<?php if ($msg) { echo '<div class="card"><b>结果：</b> '. $msg .'</div>'; } ?>
-<div class="card">
-  <div><b>状态：</b> <?php
-    $statusText = trim($status ?? 'unknown');
-    if (strpos($statusText, 'running') !== false) {
-      $pid = '';
-      if (preg_match('/pid=(\d+)/', $statusText, $matches)) {
-        $pid = ' (进程ID: ' . $matches[1] . ')';
-      }
-      echo '<span style="color: #28a745; font-weight: bold;">🟢 运行中' . $pid . '</span>';
-    } elseif (strpos($statusText, 'stopped') !== false) {
-      echo '<span style="color: #dc3545; font-weight: bold;">🔴 已停止</span>';
-    } else {
-      echo '<span style="color: #6c757d;">⚪ ' . htmlspecialchars($statusText) . '</span>';
-    }
-  ?></div>
-  <div><b>核心：</b> <?= htmlspecialchars(trim($version ?? 'unknown')) ?></div>
-  <div><b>配置：</b> <?= $selectedPath ? htmlspecialchars($selectedPath) : '未选择（请在下方选择）' ?> | <b>二进制：</b> <?= file_exists($binUsb)? htmlspecialchars($binUsb):'缺失' ?></div>
-  <div style="margin-top:10px">
-    <button onclick="executeAction('start')">启动</button>
-    <button onclick="executeAction('stop')">停止</button>
-    <button onclick="executeAction('restart')">重启服务</button>
-    <button onclick="executeAction('clearlog')">清空日志</button>
-    <button onclick="openConsole()">打开控制台</button>
-  </div>
-</div>
-<div class="card">
-  <div><b>开机即启动（不依赖阵列）</b></div>
-  <form method="POST" style="margin-top:8px">
-    <input type="hidden" name="cmd" value="set_bootstart" />
-    <label>
-      <input type="checkbox" name="enable" value="1" <?php if ($bootstartOn) echo 'checked'; ?> />
-      启用后将在系统启动阶段启动（通过 go 注入）
-    </label>
-    <div style="margin-top:8px"><button type="submit">保存</button></div>
-  </form>
-  <small>等待启动脚本就绪（最多 60 秒），可随时在此移除。</small>
-</div>
-<div class="card">
-  <div><b>选择配置文件启动</b></div>
-  <form method="POST" style="margin-top:8px">
-    <input type="hidden" name="cmd" value="select_conf" />
-    <select name="name" style="min-width:260px">
-      <?php if (!$selectedName): ?>
-        <option value="" disabled selected>请选择配置文件</option>
-      <?php endif; ?>
-      <?php foreach ($available as $f): ?>
-        <option value="<?= htmlspecialchars($f) ?>" <?= ($f === $selectedName ? 'selected' : '') ?>><?= htmlspecialchars($f) ?></option>
-      <?php endforeach; ?>
-    </select>
-    <button type="submit">保存选择</button>
-  </form>
-  <small>未选择配置时无法启动；仅列出该目录下的 .yml/.yaml 文件。</small>
-</div>
-<div class="card">
-  <div><b>配置文件管理</b></div>
-  <div style="background:#f8f9fa;padding:12px;border-radius:6px;margin:8px 0;">
-    <strong>📁 配置文件目录：</strong><br>
-    <code>/boot/config/plugins/easy-mihomo/</code><br><br>
-    <strong>📝 添加配置文件：</strong><br>
-    1. 点击下方按钮打开 Unraid 文件管理器<br>
-    2. 或通过 SMB、FTP、SSH 等方式访问 Unraid 的 /boot 分区<br>
-    3. 上传后刷新页面即可在上方选择配置<br><br>
-    <div style="margin-top:12px;">
-      <button onclick="openFileManager()" style="background:#007bff;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">
-        📂 打开文件管理器上传配置
-      </button>
-    </div>
-    <br>
-    <strong>💡 提示：</strong> 支持多个配置文件，系统会自动识别 .yaml/.yml 格式
-  </div>
-</div>
-<div class="card">
-  <div><b>在线编辑所选配置</b> <?= $selectedName? '(' . htmlspecialchars($selectedName) . ')':'' ?></div>
-  <form method="POST">
-    <input type="hidden" name="cmd" value="saveconf" />
-    <div>
-      <textarea name="content" style="width:100%;height:260px;font-family:monospace" spellcheck="false" <?= $selectedPath? '':'disabled' ?>><?php echo htmlspecialchars($confText); ?></textarea>
-    </div>
-    <div style="margin-top:8px">
-      <label><input type="checkbox" name="restart" value="1" <?= $selectedPath? '':'disabled' ?> /> 保存后重启服务</label>
-    </div>
-    <div style="margin-top:8px">
-      <button type="submit" <?= $selectedPath? '':'disabled' ?>>保存配置</button>
-    </div>
-  </form>
-  <small><?= $selectedPath? '保存将直接覆盖所选配置（上限 1MB）。':'尚未选择配置文件，请先在“选择配置文件启动”中选择。' ?></small>
-</div>
-<div class="card">
-  <div><b>日志（最近 200 行）：</b></div>
-  <pre><?= htmlspecialchars($logTail) ?></pre>
-  <div>
-    <button onclick="executeAction('start')">刷新（并尝试启动）</button>
-  </div>
-</div>
-</body>
-</html>
-]]></INLINE>
-</FILE>
-
-<!-- scripts -->
-<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/start.sh" Mode="0755">
-<INLINE><![CDATA[
-#!/bin/bash
-set -e
-BIN="/usr/local/bin/mihomo"
-CONF_DIR="/boot/config/plugins/easy-mihomo"
-SELECT_FILE="$CONF_DIR/selected.conf"
-if [ -f "$SELECT_FILE" ]; then
-  NAME=$(cat "$SELECT_FILE" 2>/dev/null || true)
-  if [ -n "$NAME" ] && [ -f "$CONF_DIR/$NAME" ]; then
-    CONF_FILE="$CONF_DIR/$NAME"
+  # 下载UI文件
+  echo "  - 正在下载UI文件..."
+  if wget -q "$GITHUB_BASE/ui.tar.gz" -O "$DOWNLOAD_DIR/ui.tar.gz"; then
+    echo "  ✓ UI文件下载完成"
+    
+    # 解压UI文件
+    echo "  - 正在解压UI文件（解压有点慢，请耐心等待，切勿关闭安装窗口）..."
+    mkdir -p "&plgPATH;/ui"
+    tar -xzf "$DOWNLOAD_DIR/ui.tar.gz" -C "&plgPATH;/ui"
+    echo "  ✓ UI文件解压完成"
   else
-    echo "未找到有效的已选配置 ("$NAME")" >&2; exit 1
+    echo "  ❌ UI文件下载失败"
+    exit 1
   fi
-else
-  echo "未选择配置，请先在页面中选择" >&2; exit 1
-fi
-LOG_FILE="/var/log/mihomo.log"
-PID_FILE="/var/run/mihomo.pid"
 
-if [ ! -x "$BIN" ]; then echo "二进制缺失: $BIN" >&2; exit 1; fi
-if [ ! -f "$CONF_FILE" ]; then echo "配置文件缺失: $CONF_FILE" >&2; exit 1; fi
+  # 清理临时文件
+  rm -rf "$DOWNLOAD_DIR"
+  echo "✓ 所有文件已从GitHub下载并安装完成"
 
-# 已在运行则退出
-if [ -f "$PID_FILE" ]; then
-  PID=$(cat "$PID_FILE" 2>/dev/null || true)
-  if [ -n "$PID" ] && ps -p "$PID" >/dev/null 2>&1; then
-    echo "running (pid $PID)"
-    exit 0
-  fi
-fi
-
-# 尝试加载 TUN（忽略失败）
-modprobe tun 2>/dev/null || true
-
-# 后台启动
-nohup "$BIN" -d "$CONF_DIR" -f "$CONF_FILE" >> "$LOG_FILE" 2>&1 &
-NEWPID=$!
-echo $NEWPID > "$PID_FILE"
-sleep 1
-
-if ps -p "$NEWPID" >/dev/null 2>&1; then
-  echo "started (pid $NEWPID)"
-  exit 0
-else
-  echo "start failed, see $LOG_FILE" >&2
-  exit 1
-fi
-]]></INLINE>
-</FILE>
-
-<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/stop.sh" Mode="0755">
-<INLINE><![CDATA[
-#!/bin/bash
-set -e
-PID_FILE="/var/run/mihomo.pid"
-
-# 优先按 pidfile 停止
-if [ -f "$PID_FILE" ]; then
-  PID=$(cat "$PID_FILE" 2>/dev/null || true)
-  if [ -n "$PID" ] && ps -p "$PID" >/dev/null 2>&1; then
-    kill "$PID" 2>/dev/null || true
-  fi
-fi
-
-# 兜底按进程名停止
-if pgrep -x mihomo >/dev/null 2>&1; then
-  # 等待优雅退出
-  for i in $(seq 1 5); do
-    if pgrep -x mihomo >/dev/null 2>&1; then
-      sleep 1
-    else
+  # 恢复用户数据
+  echo "正在恢复用户数据..."
+  BACKUP_DIRS=""
+  for dir in /tmp/mihomo-backup-*; do
+    if [ -d "$dir" ]; then
+      BACKUP_DIRS="$dir"
       break
     fi
   done
-  # 仍存活则强杀
+  if [ -n "$BACKUP_DIRS" ] && [ -d "$BACKUP_DIRS" ]; then
+    echo "  - 找到备份目录: $BACKUP_DIRS"
+    
+    # 恢复配置文件
+    if [ -d "$BACKUP_DIRS" ]; then
+      find "$BACKUP_DIRS" -name "*.yaml" -o -name "*.yml" | while read file; do
+        if [ -f "$file" ]; then
+          cp "$file" "&plgPATH;/"
+          echo "  ✓ 恢复配置文件: $file"
+        fi
+      done
+    fi
+    
+    # 恢复选择文件
+    if [ -f "$BACKUP_DIRS/selected.conf" ]; then
+      cp "$BACKUP_DIRS/selected.conf" "&plgPATH;/"
+      echo "  ✓ 恢复配置选择文件"
+    fi
+    
+    # 恢复开机启动标志
+    if [ -f "$BACKUP_DIRS/bootstart.enabled" ]; then
+      cp "$BACKUP_DIRS/bootstart.enabled" "&plgPATH;/"
+      echo "  ✓ 恢复开机启动设置"
+    fi
+    
+    # 清理备份目录
+    rm -rf "$BACKUP_DIRS"
+    echo "  ✓ 用户数据恢复完成"
+  else
+    echo "  ℹ️ 未找到备份数据，跳过恢复"
+  fi
+  </INLINE>
+  </FILE>
+
+  <!-- WebUI index -->
+  <FILE Name="/usr/local/emhttp/plugins/easy-mihomo/index.php">
+  <INLINE><![CDATA[
+  <?php
+  $baseRun = '/usr/local/emhttp/plugins/easy-mihomo';
+  $scripts = $baseRun . '/scripts';
+  $logFile = '/var/log/mihomo.log';
+  $binUsb  = '/boot/config/plugins/easy-mihomo/mihomo';
+  $confDir = '/boot/config/plugins/easy-mihomo';
+  $selectFile = $confDir . '/selected.conf';
+
+  // 预先解析已选择的配置，供后续 saveconf 与渲染使用
+  $selectedName = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
+  $selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($confDir . '/' . $selectedName) : '';
+
+  $cmd = isset($_POST['cmd']) ? $_POST['cmd'] : (isset($_GET['cmd']) ? $_GET['cmd'] : '');
+  $msg = '';
+  if ($cmd === 'start') {
+    $out = shell_exec("bash $scripts/start.sh 2>&1");
+    $msg = htmlspecialchars($out ?? '');
+  }
+  if ($cmd === 'stop') {
+    $out = shell_exec("bash $scripts/stop.sh 2>&1");
+    $msg = htmlspecialchars($out ?? '');
+  }
+  if ($cmd === 'restart') {
+    $out = shell_exec("bash $scripts/restart.sh 2>&1");
+    $msg = htmlspecialchars($out ?? '');
+  }
+  if ($cmd === 'clearlog') {
+    @file_put_contents($logFile, "");
+    $msg = '日志已清空';
+  }
+  if ($cmd === 'select_conf') {
+    $name = basename($_POST['name'] ?? '');
+    if ($name === '' || !preg_match('/\.(ya?ml)$/i', $name)) {
+      $msg = '无效的选择';
+    } else {
+      $path = $confDir . '/' . $name;
+      if (is_file($path)) {
+        if (@file_put_contents($selectFile, $name) !== false) {
+          $msg = '已选择配置：' . htmlspecialchars($name);
+        } else {
+          $msg = '保存选择失败';
+        }
+      } else {
+        $msg = '文件不存在';
+      }
+    }
+  }
+  // 上传功能已移除，请手动上传配置文件到插件目录
+  $maxSize = 1024*1024; // 1MB
+  if ($cmd === 'saveconf') {
+    $content = $_POST['content'] ?? '';
+    if ($content === '') {
+      $msg = '内容为空';
+    } else if (strlen($content) > $maxSize) {
+      $msg = '内容过大（>1MB）';
+    } else {
+      if (!$selectedPath) {
+        $msg = '未选择配置，请先在页面中选择';
+      } else {
+        if (!is_dir(dirname($selectedPath))) @mkdir(dirname($selectedPath), 0777, true);
+        if (@file_put_contents($selectedPath, $content) !== false) {
+          $msg = '配置已保存：' . htmlspecialchars($selectedPath);
+          $shouldRestart = isset($_POST['restart']) && $_POST['restart'] === '1';
+          if ($shouldRestart) {
+            $out = shell_exec("bash $scripts/restart.sh 2>&1");
+            $msg .= '，并已重启服务';
+            if (!empty($out)) $msg .= ': ' . htmlspecialchars($out);
+          }
+        } else {
+          $msg = '保存失败';
+        }
+      }
+    }
+  }
+  $status = shell_exec("bash $scripts/status.sh 2>&1");
+  $version = shell_exec("bash $scripts/version.sh 2>&1");
+  $logTail = file_exists($logFile) ? trim(shell_exec("tail -n 200 $logFile 2>&1")) : '';
+
+  // 处理上传重定向返回的消息
+  if (isset($_GET['uploadmsg']) && $_GET['uploadmsg'] !== '') {
+    $msg = $_GET['uploadmsg'];
+  }
+  // 仅在输出 HTML 前设置内容类型，避免影响上传重定向
+  header('Content-Type: text/html; charset=utf-8');
+
+  $confText = ($selectedPath && file_exists($selectedPath)) ? @file_get_contents($selectedPath) : '';
+  $available = array_values(array_filter(scandir($confDir) ?: [], function($f) use ($confDir){
+    return is_file($confDir . '/' . $f) && preg_match('/\.(ya?ml)$/i', $f);
+  }));
+
+  // 开机即启动（不依赖阵列）设置
+  $bootFlag = '/boot/config/plugins/easy-mihomo/bootstart.enabled';
+  if ($cmd === 'set_bootstart') {
+    $enable = ($_POST['enable'] ?? '') === '1';
+    $goPath = '/boot/config/go';
+    $begin = "# BEGIN easy-mihomo (do not edit)";
+    $end   = "# END easy-mihomo";
+    $block = $begin . "\n" .
+      "(\n" .
+      "cat <<'EOF' >/tmp/easy-mihomo-boot.sh\n" .
+      "#!/bin/bash\n" .
+      "FLAG=\"/boot/config/plugins/easy-mihomo/bootstart.enabled\"\n" .
+      "START_SH=\"/usr/local/emhttp/plugins/easy-mihomo/scripts/start.sh\"\n" .
+      "LOG=\"/var/log/mihomo.log\"\n" .
+      "for i in \$(seq 1 60); do\n" .
+      "  if [ -x \"\$START_SH\" ]; then break; fi\n" .
+      "  sleep 1\n" .
+      "done\n" .
+      "if [ -f \"\$FLAG\" ] && [ -x \"\$START_SH\" ]; then\n" .
+      "  echo \"[easy-mihomo] boot detected, starting service...\" >> \"\$LOG\" 2>&1\n" .
+      "  bash \"\$START_SH\" >> \"\$LOG\" 2>&1 || true\n" .
+      "fi\n" .
+      "rm -f /tmp/easy-mihomo-boot.sh\n" .
+      "EOF\n" .
+      "bash /tmp/easy-mihomo-boot.sh &\n" .
+      ")\n" .
+      $end . "\n";
+
+    if ($enable) {
+      if (!is_dir(dirname($bootFlag))) @mkdir(dirname($bootFlag), 0777, true);
+      @file_put_contents($bootFlag, 'enabled');
+      $go = file_exists($goPath) ? @file_get_contents($goPath) : "";
+      if (strpos($go, $begin) !== false && strpos($go, $end) !== false) {
+        $pattern = sprintf('/%s[\s\S]*?%s\n?/m', preg_quote($begin, '/'), preg_quote($end, '/'));
+        $go = preg_replace($pattern, $block, $go, 1);
+      } else {
+        if ($go !== "" && substr($go, -1) !== "\n") $go .= "\n";
+        $go .= $block;
+      }
+      @file_put_contents($goPath, $go);
+      $msg = 'bootstart enabled (go injected)';
+    } else {
+      @unlink($bootFlag);
+      $go = file_exists($goPath) ? @file_get_contents($goPath) : "";
+      if ($go !== "") {
+        $pattern = sprintf('/%s[\s\S]*?%s\n?/m', preg_quote($begin, '/'), preg_quote($end, '/'));
+        $newGo = preg_replace($pattern, '', $go, 1);
+        if ($newGo !== null) @file_put_contents($goPath, $newGo);
+      }
+      $msg = 'bootstart disabled (go cleaned)';
+    }
+  }
+  $bootstartOn = file_exists($bootFlag);
+
+  // 检查安装状态
+  $installStatus = '';
+  $binExists = file_exists('/usr/local/bin/mihomo');
+  $uiExists = is_dir('/boot/config/plugins/easy-mihomo/ui');
+
+  // 检查插件目录下是否有任何配置文件
+  $confDir = '/boot/config/plugins/easy-mihomo';
+  $confExists = false;
+  if (is_dir($confDir)) {
+    $files = scandir($confDir);
+    foreach ($files as $file) {
+      if (preg_match('/\.(ya?ml)$/i', $file)) {
+        $confExists = true;
+        break;
+      }
+    }
+  }
+
+  // 只检查核心组件，配置文件由用户自己上传
+  if (!$binExists) {
+    $installStatus = '<div class="error">❌ 缺少二进制文件，请重新安装插件</div>';
+  } elseif (!$uiExists) {
+    $installStatus = '<div class="warning">⚠️ 缺少UI文件，部分功能可能不可用</div>';
+  } elseif (!$confExists) {
+    $installStatus = '<div class="success">💡 请上传配置文件到插件目录，或使用下方文件管理器</div>';
+  }
+  ?>
+  <!DOCTYPE html>
+  <html>
+  <head>
+  <meta charset="utf-8" />
+  <title>Easy-Mihomo</title>
+  <style>
+  body{font-family:Arial,Helvetica,sans-serif;margin:16px;color:#222}
+  .card{border:1px solid #ddd;border-radius:8px;padding:16px;margin-bottom:16px}
+  pre{background:#f7f7f7;border:1px solid #eee;border-radius:6px;padding:10px;max-height:360px;overflow:auto}
+  button{padding:8px 14px;margin-right:8px;cursor:pointer}
+  input[type=file]{margin-top:8px;margin-bottom:8px}
+  .warning{background:#fff3cd;border:1px solid #ffeaa7;color:#856404;padding:12px;border-radius:6px;margin-bottom:16px}
+  .error{color:#dc3545;margin:4px 0;font-size:14px}
+  .success{color:#28a745;margin:4px 0;font-size:14px}
+  </style>
+  <script>
+  function executeAction(action) {
+    // 使用GET参数直接跳转
+    var url = new URL(window.location);
+    url.searchParams.set('cmd', action);
+    window.location.href = url.toString();
+  }
+
+  function openConsole() {
+    // 获取当前页面的主机名（不包含端口）
+    var currentHostname = window.location.hostname;
+    var consoleUrl = 'http://' + currentHostname + ':9090/ui/zashboard/#/proxies';
+    // 在新标签页中打开控制台
+    window.open(consoleUrl, '_blank');
+  }
+
+  function openFileManager() {
+    // 获取当前页面的主机名和端口
+    var currentHostname = window.location.hostname;
+    var currentPort = window.location.port;
+    // 构建文件管理器URL，直接定位到插件配置目录
+    var fileManagerUrl = 'http://' + currentHostname + ':' + currentPort + '/Main/Browse?dir=%2Fboot%2Fconfig%2Fplugins%2Feasy-mihomo';
+    // 在新标签页中打开文件管理器
+    window.open(fileManagerUrl, '_blank');
+  }
+
+  // 使用浏览器原生表单提交，确保 emhttp 正常接收带 Content-Length 的上传
+  </script>
+  </head>
+  <body>
+  <h2>Mihomo 管理</h2>
+  <?php if ($installStatus) { echo $installStatus; } ?>
+  <?php if ($msg) { echo '<div class="card"><b>结果：</b> '. $msg .'</div>'; } ?>
+  <div class="card">
+    <div><b>状态：</b> <?php
+      $statusText = trim($status ?? 'unknown');
+      if (strpos($statusText, 'running') !== false) {
+        $pid = '';
+        if (preg_match('/pid=(\d+)/', $statusText, $matches)) {
+          $pid = ' (进程ID: ' . $matches[1] . ')';
+        }
+        echo '<span style="color: #28a745; font-weight: bold;">🟢 运行中' . $pid . '</span>';
+      } elseif (strpos($statusText, 'stopped') !== false) {
+        echo '<span style="color: #dc3545; font-weight: bold;">🔴 已停止</span>';
+      } else {
+        echo '<span style="color: #6c757d;">⚪ ' . htmlspecialchars($statusText) . '</span>';
+      }
+    ?></div>
+    <div><b>核心：</b> <?= htmlspecialchars(trim($version ?? 'unknown')) ?></div>
+    <div><b>配置：</b> <?= $selectedPath ? htmlspecialchars($selectedPath) : '未选择（请在下方选择）' ?> | <b>二进制：</b> <?= file_exists($binUsb)? htmlspecialchars($binUsb):'缺失' ?></div>
+    <div style="margin-top:10px">
+      <button onclick="executeAction('start')">启动</button>
+      <button onclick="executeAction('stop')">停止</button>
+      <button onclick="executeAction('restart')">重启服务</button>
+      <button onclick="executeAction('clearlog')">清空日志</button>
+      <button onclick="openConsole()">打开控制台</button>
+    </div>
+  </div>
+  <div class="card">
+    <div><b>开机即启动（不依赖阵列）</b></div>
+    <form method="POST" style="margin-top:8px">
+      <input type="hidden" name="cmd" value="set_bootstart" />
+      <label>
+        <input type="checkbox" name="enable" value="1" <?php if ($bootstartOn) echo 'checked'; ?> />
+        启用后将在系统启动阶段启动（通过 go 注入）
+      </label>
+      <div style="margin-top:8px"><button type="submit">保存</button></div>
+    </form>
+    <small>等待启动脚本就绪（最多 60 秒），可随时在此移除。</small>
+  </div>
+  <div class="card">
+    <div><b>选择配置文件启动</b></div>
+    <form method="POST" style="margin-top:8px">
+      <input type="hidden" name="cmd" value="select_conf" />
+      <select name="name" style="min-width:260px">
+        <?php if (!$selectedName): ?>
+          <option value="" disabled selected>请选择配置文件</option>
+        <?php endif; ?>
+        <?php foreach ($available as $f): ?>
+          <option value="<?= htmlspecialchars($f) ?>" <?= ($f === $selectedName ? 'selected' : '') ?>><?= htmlspecialchars($f) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button type="submit">保存选择</button>
+    </form>
+    <small>未选择配置时无法启动；仅列出该目录下的 .yml/.yaml 文件。</small>
+  </div>
+  <div class="card">
+    <div><b>配置文件管理</b></div>
+    <div style="background:#f8f9fa;padding:12px;border-radius:6px;margin:8px 0;">
+      <strong>📁 配置文件目录：</strong><br>
+      <code>/boot/config/plugins/easy-mihomo/</code><br><br>
+      <strong>📝 添加配置文件：</strong><br>
+      1. 点击下方按钮打开 Unraid 文件管理器<br>
+      2. 或通过 SMB、FTP、SSH 等方式访问 Unraid 的 /boot 分区<br>
+      3. 上传后刷新页面即可在上方选择配置<br><br>
+      <div style="margin-top:12px;">
+        <button onclick="openFileManager()" style="background:#007bff;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">
+          📂 打开文件管理器上传配置
+        </button>
+      </div>
+      <br>
+      <strong>💡 提示：</strong> 支持多个配置文件，系统会自动识别 .yaml/.yml 格式
+    </div>
+  </div>
+  <div class="card">
+    <div><b>在线编辑所选配置</b> <?= $selectedName? '(' . htmlspecialchars($selectedName) . ')':'' ?></div>
+    <form method="POST">
+      <input type="hidden" name="cmd" value="saveconf" />
+      <div>
+        <textarea name="content" style="width:100%;height:260px;font-family:monospace" spellcheck="false" <?= $selectedPath? '':'disabled' ?>><?php echo htmlspecialchars($confText); ?></textarea>
+      </div>
+      <div style="margin-top:8px">
+        <label><input type="checkbox" name="restart" value="1" <?= $selectedPath? '':'disabled' ?> /> 保存后重启服务</label>
+      </div>
+      <div style="margin-top:8px">
+        <button type="submit" <?= $selectedPath? '':'disabled' ?>>保存配置</button>
+      </div>
+    </form>
+    <small><?= $selectedPath? '保存将直接覆盖所选配置（上限 1MB）。':'尚未选择配置文件，请先在“选择配置文件启动”中选择。' ?></small>
+  </div>
+  <div class="card">
+    <div><b>日志（最近 200 行）：</b></div>
+    <pre><?= htmlspecialchars($logTail) ?></pre>
+    <div>
+      <button onclick="executeAction('start')">刷新（并尝试启动）</button>
+    </div>
+  </div>
+  </body>
+  </html>
+  ]]></INLINE>
+  </FILE>
+
+  <!-- scripts -->
+  <FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/start.sh" Mode="0755">
+  <INLINE><![CDATA[
+  #!/bin/bash
+  set -e
+  BIN="/usr/local/bin/mihomo"
+  CONF_DIR="/boot/config/plugins/easy-mihomo"
+  SELECT_FILE="$CONF_DIR/selected.conf"
+  if [ -f "$SELECT_FILE" ]; then
+    NAME=$(cat "$SELECT_FILE" 2>/dev/null || true)
+    if [ -n "$NAME" ] && [ -f "$CONF_DIR/$NAME" ]; then
+      CONF_FILE="$CONF_DIR/$NAME"
+    else
+      echo "未找到有效的已选配置 ("$NAME")" >&2; exit 1
+    fi
+  else
+    echo "未选择配置，请先在页面中选择" >&2; exit 1
+  fi
+  LOG_FILE="/var/log/mihomo.log"
+  PID_FILE="/var/run/mihomo.pid"
+
+  if [ ! -x "$BIN" ]; then echo "二进制缺失: $BIN" >&2; exit 1; fi
+  if [ ! -f "$CONF_FILE" ]; then echo "配置文件缺失: $CONF_FILE" >&2; exit 1; fi
+
+  # 已在运行则退出
+  if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [ -n "$PID" ] && ps -p "$PID" >/dev/null 2>&1; then
+      echo "running (pid $PID)"
+      exit 0
+    fi
+  fi
+
+  # 尝试加载 TUN（忽略失败）
+  modprobe tun 2>/dev/null || true
+
+  # 后台启动
+  nohup "$BIN" -d "$CONF_DIR" -f "$CONF_FILE" >> "$LOG_FILE" 2>&1 &
+  NEWPID=$!
+  echo $NEWPID > "$PID_FILE"
+  sleep 1
+
+  if ps -p "$NEWPID" >/dev/null 2>&1; then
+    echo "started (pid $NEWPID)"
+    exit 0
+  else
+    echo "start failed, see $LOG_FILE" >&2
+    exit 1
+  fi
+  ]]></INLINE>
+  </FILE>
+
+  <FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/stop.sh" Mode="0755">
+  <INLINE><![CDATA[
+  #!/bin/bash
+  set -e
+  PID_FILE="/var/run/mihomo.pid"
+
+  # 优先按 pidfile 停止
+  if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [ -n "$PID" ] && ps -p "$PID" >/dev/null 2>&1; then
+      kill "$PID" 2>/dev/null || true
+    fi
+  fi
+
+  # 兜底按进程名停止
   if pgrep -x mihomo >/dev/null 2>&1; then
+    # 等待优雅退出
+    for i in $(seq 1 5); do
+      if pgrep -x mihomo >/dev/null 2>&1; then
+        sleep 1
+      else
+        break
+      fi
+    done
+    # 仍存活则强杀
+    if pgrep -x mihomo >/dev/null 2>&1; then
+      pkill -9 -x mihomo 2>/dev/null || true
+    fi
+  fi
+
+  # 清理 pidfile（若进程已不存在）
+  if [ -f "$PID_FILE" ]; then
+    if ! ps -p $(cat "$PID_FILE" 2>/dev/null || echo 0) >/dev/null 2>&1; then
+      rm -f "$PID_FILE"
+    fi
+  fi
+
+  echo "stopped"
+  ]]></INLINE>
+  </FILE>
+
+  <FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/restart.sh" Mode="0755">
+  <INLINE><![CDATA[
+  #!/bin/bash
+  set -e
+  SCRIPT_DIR="/usr/local/emhttp/plugins/easy-mihomo/scripts"
+
+  bash "$SCRIPT_DIR/stop.sh" || true
+  sleep 1
+  bash "$SCRIPT_DIR/start.sh"
+  ]]></INLINE>
+  </FILE>
+
+  <FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/status.sh" Mode="0755">
+  <INLINE><![CDATA[
+  #!/bin/bash
+  set -e
+  PID_FILE="/var/run/mihomo.pid"
+  STATUS="stopped"; PID=""
+  if pgrep -x mihomo >/dev/null 2>&1; then STATUS="running"; PID=$(pgrep -x mihomo | head -n1); fi
+  echo "status=$STATUS pid=$PID"
+  ]]></INLINE>
+  </FILE>
+
+  <FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/version.sh" Mode="0755">
+  <INLINE><![CDATA[
+  #!/bin/bash
+  set -e
+  BIN="/usr/local/bin/mihomo"
+  if [ -f "$BIN" ]; then 
+    # 在vfat文件系统上，直接尝试执行
+    "$BIN" -v 2>&1 | head -n 1 || echo "binary exists but cannot execute"
+  else 
+    echo "binary missing"
+  fi
+  ]]></INLINE>
+  </FILE>
+
+  <!-- Main page content -->
+  <FILE Name="/usr/local/emhttp/plugins/easy-mihomo/EasyMihomo.Main.page">
+  <INLINE><![CDATA[
+  Menu="Utilities"
+  Type="xmenu"
+  Title="Easy-Mihomo"
+  Icon="icon-network"
+  Tabs="false"
+  ---
+  <?php
+  include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
+  ?>
+  ]]></INLINE>
+  </FILE>
+
+  <!-- post-install: setup menu entry -->
+  <FILE Run="/bin/bash">
+  <INLINE>
+  set -e
+  mkdir -p &emhttp;/scripts;
+
+  echo "Mihomo plugin installed. Persistent path: &plgPATH;"
+  </INLINE>
+  </FILE>
+
+  <!-- version cleanup -->
+  <FILE Run="/bin/bash">
+  <INLINE>
+  set -e
+  echo "Cleanup completed"
+  </INLINE>
+  </FILE>
+
+  <!-- remove -->
+  <FILE Run="/bin/bash" Method="remove">
+  <INLINE>
+  set -e
+  echo "正在卸载 Easy-Mihomo 插件..."
+
+  # 停止mihomo进程
+  echo "  - 正在停止 Mihomo 服务..."
+  if pgrep -x mihomo >/dev/null 2>&amp;1; then
     pkill -9 -x mihomo 2>/dev/null || true
+    echo "  ✓ Mihomo 服务已停止"
+  else
+    echo "  ✓ Mihomo 服务未运行"
   fi
-fi
 
-# 清理 pidfile（若进程已不存在）
-if [ -f "$PID_FILE" ]; then
-  if ! ps -p $(cat "$PID_FILE" 2>/dev/null || echo 0) >/dev/null 2>&1; then
-    rm -f "$PID_FILE"
-  fi
-fi
+  # 清理PID文件
+  echo "  - 清理进程文件..."
+  rm -f /var/run/mihomo.pid
+  echo "  ✓ 进程文件已清理"
 
-echo "stopped"
-]]></INLINE>
-</FILE>
+  # 清理二进制文件
+  echo "  - 清理二进制文件..."
+  rm -f /usr/local/bin/mihomo
+  echo "  ✓ 二进制文件已清理"
 
-<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/restart.sh" Mode="0755">
-<INLINE><![CDATA[
-#!/bin/bash
-set -e
-SCRIPT_DIR="/usr/local/emhttp/plugins/easy-mihomo/scripts"
+  # 清理插件目录
+  echo "  - 清理插件目录..."
+  rm -rf &emhttp;
+  rm -rf &plgPATH;
+  echo "  ✓ 插件目录已清理"
 
-bash "$SCRIPT_DIR/stop.sh" || true
-sleep 1
-bash "$SCRIPT_DIR/start.sh"
-]]></INLINE>
-</FILE>
+  # 清理系统覆盖层文件（仅限本插件命名空间）
+  echo "  - 清理系统文件..."
+  rm -rf /var/local/overlay/usr/local/emhttp/plugins/easy-mihomo
+  rm -f /var/local/overlay/usr/local/emhttp/plugins/easy-mihomo.*
+  echo "  ✓ 系统文件已清理"
 
-<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/status.sh" Mode="0755">
-<INLINE><![CDATA[
-#!/bin/bash
-set -e
-PID_FILE="/var/run/mihomo.pid"
-STATUS="stopped"; PID=""
-if pgrep -x mihomo >/dev/null 2>&1; then STATUS="running"; PID=$(pgrep -x mihomo | head -n1); fi
-echo "status=$STATUS pid=$PID"
-]]></INLINE>
-</FILE>
+  # 清理日志文件
+  echo "  - 清理日志文件..."
+  rm -f /var/log/mihomo.log
+  echo "  ✓ 日志文件已清理"
 
-<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/version.sh" Mode="0755">
-<INLINE><![CDATA[
-#!/bin/bash
-set -e
-BIN="/usr/local/bin/mihomo"
-if [ -f "$BIN" ]; then 
-  # 在vfat文件系统上，直接尝试执行
-  "$BIN" -v 2>&1 | head -n 1 || echo "binary exists but cannot execute"
-else 
-  echo "binary missing"
-fi
-]]></INLINE>
-</FILE>
+  # 清理临时文件
+  echo "  - 清理临时文件..."
+  rm -f /tmp/mihomo
+  echo "  ✓ 临时文件已清理"
 
-<!-- Main page content -->
-<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/EasyMihomo.Main.page">
-<INLINE><![CDATA[
-Menu="Utilities"
-Type="xmenu"
-Title="Easy-Mihomo"
-Icon="icon-network"
-Tabs="false"
----
-<?php
-include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
-?>
-]]></INLINE>
-</FILE>
+  # 清理开机即启动注入与标志
+  echo "  - 清理开机启动配置..."
+  sed -i "/^# BEGIN easy-mihomo (do not edit)$/,/^# END easy-mihomo$/d" /boot/config/go 2>/dev/null || true
+  rm -f /boot/config/plugins/easy-mihomo/bootstart.enabled
+  echo "  ✓ 开机启动配置已清理"
 
-<!-- post-install: setup menu entry -->
-<FILE Run="/bin/bash">
-<INLINE>
-set -e
-mkdir -p &emhttp;/scripts;
+  echo ""
+  echo "🎉 Easy-Mihomo 插件卸载完成！"
+  echo "   所有相关文件和配置已完全清理。"
+  </INLINE>
+  </FILE>
 
-echo "Mihomo plugin installed. Persistent path: &plgPATH;"
-</INLINE>
-</FILE>
-
-<!-- version cleanup -->
-<FILE Run="/bin/bash">
-<INLINE>
-set -e
-echo "Cleanup completed"
-</INLINE>
-</FILE>
-
-<!-- remove -->
-<FILE Run="/bin/bash" Method="remove">
-<INLINE>
-set -e
-echo "正在卸载 Easy-Mihomo 插件..."
-
-# 停止mihomo进程
-echo "  - 正在停止 Mihomo 服务..."
-if pgrep -x mihomo >/dev/null 2>&amp;1; then
-  pkill -9 -x mihomo 2>/dev/null || true
-  echo "  ✓ Mihomo 服务已停止"
-else
-  echo "  ✓ Mihomo 服务未运行"
-fi
-
-# 清理PID文件
-echo "  - 清理进程文件..."
-rm -f /var/run/mihomo.pid
-echo "  ✓ 进程文件已清理"
-
-# 清理二进制文件
-echo "  - 清理二进制文件..."
-rm -f /usr/local/bin/mihomo
-echo "  ✓ 二进制文件已清理"
-
-# 清理插件目录
-echo "  - 清理插件目录..."
-rm -rf &emhttp;
-rm -rf &plgPATH;
-echo "  ✓ 插件目录已清理"
-
-# 清理系统覆盖层文件（仅限本插件命名空间）
-echo "  - 清理系统文件..."
-rm -rf /var/local/overlay/usr/local/emhttp/plugins/easy-mihomo
-rm -f /var/local/overlay/usr/local/emhttp/plugins/easy-mihomo.*
-echo "  ✓ 系统文件已清理"
-
-# 清理日志文件
-echo "  - 清理日志文件..."
-rm -f /var/log/mihomo.log
-echo "  ✓ 日志文件已清理"
-
-# 清理临时文件
-echo "  - 清理临时文件..."
-rm -f /tmp/mihomo
-echo "  ✓ 临时文件已清理"
-
-# 清理开机即启动注入与标志
-echo "  - 清理开机启动配置..."
-sed -i "/^# BEGIN easy-mihomo (do not edit)$/,/^# END easy-mihomo$/d" /boot/config/go 2>/dev/null || true
-rm -f /boot/config/plugins/easy-mihomo/bootstart.enabled
-echo "  ✓ 开机启动配置已清理"
-
-echo ""
-echo "🎉 Easy-Mihomo 插件卸载完成！"
-echo "   所有相关文件和配置已完全清理。"
-</INLINE>
-</FILE>
-
-</PLUGIN>
+  </PLUGIN>
