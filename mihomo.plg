@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.1">
+<!ENTITY version   "1.0.0">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,11 +14,6 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
-1.0.1  优化更新机制
-- 更新时跳过UI文件下载，避免覆盖用户自定义UI
-- 优化安装流程，减少不必要的文件传输
-- 改进安装完成信息显示
-
 1.0.0  初始版本发布
 - 支持基本的代理功能
 - 集成 Web 管理界面
@@ -39,7 +34,7 @@ mkdir -p &plgPATH;
 
 <!-- copy files from source directory -->
 <FILE Run="/bin/bash">
-<INLINE>
+<INLINE><![CDATA[
 set -e
 mkdir -p &plgPATH;
 mkdir -p &emhttp;/scripts;
@@ -118,7 +113,7 @@ if [ "$UI_EXISTS" = true ]; then
 else
   echo "✓ 所有文件已从GitHub下载并安装完成"
 fi
-</INLINE>
+]]></INLINE>
 </FILE>
 
 <!-- WebUI index -->
