@@ -1,8 +1,8 @@
-  <?xml version='1.0' standalone='yes'?>
-  <!DOCTYPE PLUGIN [
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
   <!ENTITY name      "easy-mihomo">
   <!ENTITY author    "隔壁小王">
-  <!ENTITY version   "1.0.4">
+  <!ENTITY version   "1.0.5">
   <!ENTITY launch    "Settings/EasyMihomo.Main">
   <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
   <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,6 +14,11 @@
   <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.5  修复XML解析错误
+- 修复文件开头的空格导致的XML解析错误
+- 确保XML声明在文件第一行
+- 解决Unraid插件解析器无法识别的问题
+
 1.0.4  修复XML解析错误
 - 修复备份目录命名中的特殊字符问题
 - 简化备份目录命名，避免XML解析冲突
