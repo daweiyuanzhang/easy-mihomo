@@ -44,15 +44,32 @@ echo "正在创建目录结构..."
 mkdir -p &plgPATH;
 mkdir -p &emhttp;/scripts;
 
+# 查找插件文件位置
+PLUGIN_DIR=""
 if [ -d "&sourceDir;" ]; then
+  PLUGIN_DIR="&sourceDir;"
+elif [ -d "/tmp/plugins" ]; then
+  PLUGIN_DIR="/tmp/plugins"
+elif [ -d "/var/tmp/plugins" ]; then
+  PLUGIN_DIR="/var/tmp/plugins"
+else
+  # 尝试从当前脚本位置推断
+  SCRIPT_DIR=$(dirname "$0" 2>/dev/null || echo "")
+  if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR" ]; then
+    PLUGIN_DIR="$SCRIPT_DIR"
+  fi
+fi
+
+if [ -n "$PLUGIN_DIR" ] && [ -d "$PLUGIN_DIR" ]; then
   echo "正在复制核心文件..."
+  echo "  - 插件目录: $PLUGIN_DIR"
   
   # 解压mihomo二进制文件
-  if [ -f "&sourceDir;/mihomo-linux-amd64-v3-go123-v1.19.14.gz" ]; then
+  if [ -f "$PLUGIN_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" ]; then
     echo "  - 正在解压 mihomo 核心..."
     MIHOME_TMP="/tmp/mihomo-latest"
     
-    if gunzip -c "&sourceDir;/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
+    if gunzip -c "$PLUGIN_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
       # 解压成功，复制到目标位置
       cp "$MIHOME_TMP" "/usr/local/bin/mihomo"
       chmod +x "/usr/local/bin/mihomo"
@@ -65,34 +82,40 @@ if [ -d "&sourceDir;" ]; then
       rm -f "$MIHOME_TMP"
       exit 1
     fi
-  elif [ -f "&sourceDir;/mihomo" ]; then
+  elif [ -f "$PLUGIN_DIR/mihomo" ]; then
     echo "  - 复制 mihomo 二进制文件..."
-    cp "&sourceDir;/mihomo" "/usr/local/bin/mihomo"
+    cp "$PLUGIN_DIR/mihomo" "/usr/local/bin/mihomo"
     chmod +x "/usr/local/bin/mihomo"
-    cp "&sourceDir;/mihomo" "&plgPATH;/mihomo"
+    cp "$PLUGIN_DIR/mihomo" "&plgPATH;/mihomo"
     echo "  ✓ mihomo 二进制文件已安装"
   else
-    echo "  ❌ 找不到 mihomo 核心文件"
+    echo "  ❌ 在 $PLUGIN_DIR 中找不到 mihomo 核心文件"
+    echo "  - 目录内容:"
+    ls -la "$PLUGIN_DIR" 2>/dev/null || echo "    无法列出目录内容"
     exit 1
   fi
   
   # 配置文件需要用户自己上传，不再自动复制
   
   # 解压UI文件
-  if [ -f "&sourceDir;/ui.tar.gz" ]; then
+  if [ -f "$PLUGIN_DIR/ui.tar.gz" ]; then
     echo "  - 正在解压UI文件（解压有点慢，请耐心等待，切勿关闭安装窗口）..."
     mkdir -p "&plgPATH;/ui"
-    tar -xzf "&sourceDir;/ui.tar.gz" -C "&plgPATH;/ui"
+    tar -xzf "$PLUGIN_DIR/ui.tar.gz" -C "&plgPATH;/ui"
     echo "  ✓ UI文件解压完成"
-  elif [ -d "&sourceDir;/ui" ]; then
+  elif [ -d "$PLUGIN_DIR/ui" ]; then
     echo "  - 正在复制UI文件（约11MB，请稍候）..."
-    cp -r "&sourceDir;/ui" "&plgPATH;/ui"
+    cp -r "$PLUGIN_DIR/ui" "&plgPATH;/ui"
     echo "  ✓ UI文件复制完成"
   fi
   
-  echo "✓ 所有文件已从 &sourceDir; 复制到 &plgPATH;"
+  echo "✓ 所有文件已从 $PLUGIN_DIR 复制到 &plgPATH;"
 else
-  echo "❌ 源目录 &sourceDir; 未找到"
+  echo "❌ 找不到插件文件目录"
+  echo "  - 尝试的目录:"
+  echo "    &sourceDir;"
+  echo "    /tmp/plugins"
+  echo "    /var/tmp/plugins"
   exit 1
 fi
 </INLINE>
