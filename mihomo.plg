@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.1">
+<!ENTITY version   "1.0.0">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,11 +14,6 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
-1.0.1  修复插件路径问题
-- 修复CDATA中的实体引用问题
-- 更新时自动停止mihomo服务
-- 强制覆盖现有二进制文件
-
 1.0.0  初始版本发布
 - 支持基本的代理功能
 - 集成 Web 管理界面
