@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.1">
+<!ENTITY version   "1.0.2">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,6 +14,12 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.2  改进更新逻辑
+- 添加用户数据备份和恢复机制
+- 更新时自动保护用户配置文件
+- 更新时自动保护用户设置（开机启动等）
+- 改进更新过程的用户体验
+
 1.0.1  修复安装问题
 - 修复 GitHub URL 安装时文件下载失败的问题
 - 统一使用 GitHub 下载方式，简化安装逻辑
@@ -27,10 +33,43 @@
 - 支持在线编辑配置
 </CHANGES>
 
-<!-- pre-install: ensure clean run dir -->
+<!-- pre-install: backup user data before update -->
 <FILE Run="/bin/bash">
 <INLINE>
 set -e
+echo "正在备份用户数据..."
+
+# 备份用户配置文件
+if [ -d "&plgPATH;" ]; then
+  BACKUP_DIR="/tmp/mihomo-backup-$(date +%s)"
+  mkdir -p "$BACKUP_DIR"
+  
+  # 备份配置文件
+  if [ -d "&plgPATH;" ]; then
+    find "&plgPATH;" -name "*.yaml" -o -name "*.yml" | while read file; do
+      if [ -f "$file" ]; then
+        cp "$file" "$BACKUP_DIR/"
+        echo "  ✓ 备份配置文件: $(basename "$file")"
+      fi
+    done
+  fi
+  
+  # 备份选择文件
+  if [ -f "&plgPATH;/selected.conf" ]; then
+    cp "&plgPATH;/selected.conf" "$BACKUP_DIR/"
+    echo "  ✓ 备份配置选择文件"
+  fi
+  
+  # 备份开机启动标志
+  if [ -f "&plgPATH;/bootstart.enabled" ]; then
+    cp "&plgPATH;/bootstart.enabled" "$BACKUP_DIR/"
+    echo "  ✓ 备份开机启动设置"
+  fi
+  
+  echo "  ✓ 用户数据备份完成: $BACKUP_DIR"
+fi
+
+# 清理旧文件
 rm -rf &emhttp;
 mkdir -p &emhttp;/scripts
 mkdir -p &plgPATH;
@@ -104,6 +143,41 @@ fi
 # 清理临时文件
 rm -rf "$DOWNLOAD_DIR"
 echo "✓ 所有文件已从GitHub下载并安装完成"
+
+# 恢复用户数据
+echo "正在恢复用户数据..."
+BACKUP_DIRS=$(find /tmp -name "mihomo-backup-*" -type d 2>/dev/null | sort -r | head -1)
+if [ -n "$BACKUP_DIRS" ] && [ -d "$BACKUP_DIRS" ]; then
+  echo "  - 找到备份目录: $BACKUP_DIRS"
+  
+  # 恢复配置文件
+  if [ -d "$BACKUP_DIRS" ]; then
+    find "$BACKUP_DIRS" -name "*.yaml" -o -name "*.yml" | while read file; do
+      if [ -f "$file" ]; then
+        cp "$file" "&plgPATH;/"
+        echo "  ✓ 恢复配置文件: $(basename "$file")"
+      fi
+    done
+  fi
+  
+  # 恢复选择文件
+  if [ -f "$BACKUP_DIRS/selected.conf" ]; then
+    cp "$BACKUP_DIRS/selected.conf" "&plgPATH;/"
+    echo "  ✓ 恢复配置选择文件"
+  fi
+  
+  # 恢复开机启动标志
+  if [ -f "$BACKUP_DIRS/bootstart.enabled" ]; then
+    cp "$BACKUP_DIRS/bootstart.enabled" "&plgPATH;/"
+    echo "  ✓ 恢复开机启动设置"
+  fi
+  
+  # 清理备份目录
+  rm -rf "$BACKUP_DIRS"
+  echo "  ✓ 用户数据恢复完成"
+else
+  echo "  ℹ️ 未找到备份数据，跳过恢复"
+fi
 </INLINE>
 </FILE>
 
