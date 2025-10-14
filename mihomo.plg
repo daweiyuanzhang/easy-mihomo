@@ -787,9 +787,9 @@ function formatBytes($size, $precision = 2) {
     @import url("/plugins/easy-mihomo/css/style.css");
 </style>
 
-<table id='db-mihomo' class='dash_mihomo dashboard box1' style='display:none'>
-    <thead sort='954'><tr class='hidden'><td></td><td colspan='3'></td><td></td></tr></thead>
-    <tbody sort='954' class='sortable'>
+<table id='db-box1' class='dash_mihomo dashboard box1' style='display:none'>
+    <thead sort='955'><tr class='hidden'><td></td><td colspan='3'></td><td></td></tr></thead>
+    <tbody sort='955' class='sortable'>
         <tr>
             <td></td>
             <td class='next' colspan='3'>
@@ -801,7 +801,7 @@ function formatBytes($size, $precision = 2) {
                     </span>
                 </div>
                 <i class='fa fa-fw chevron mt0' id='dash_mihomo_toggle' onclick='toggleChevron("dash_mihomo_toggle",0)'></i>
-                <a href='/Settings/EasyMihomo.Main' id='dash_mihomo_settings' title='Go to Mihomo settings'><i class='fa fa-fw fa-cog chevron mt0'></i></a>
+                <a href='/Dashboard/Settings/EasyMihomo.Main' id='dash_mihomo_settings' title='Go to Mihomo settings'><i class='fa fa-fw fa-cog chevron mt0'></i></a>
                 <br><br>
             </td>
             <td></td>
