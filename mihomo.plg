@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.0">
+<!ENTITY version   "1.0.1">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,6 +14,14 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.1  日志管理增强版
+- 新增自动日志清理功能
+- 支持定期清理（每天凌晨2点）
+- 智能保留最近1000行日志
+- 添加日志状态监控显示
+- 新增手动智能清理按钮
+- 优化日志文件大小管理
+
 1.0.0  初始版本发布
 - 支持基本的代理功能
 - 集成 Web 管理界面
@@ -121,6 +129,50 @@ fi
 # 清理临时文件
 rm -rf "$DOWNLOAD_DIR"
 
+# 创建定期日志清理脚本
+echo "  - 正在创建日志清理脚本..."
+cat > "/usr/local/emhttp/plugins/easy-mihomo/scripts/log_cleanup.sh" << 'EOF'
+#!/bin/bash
+# Mihomo 日志定期清理脚本
+LOG_FILE="/var/log/mihomo.log"
+MAX_SIZE="10MB"  # 最大日志大小
+KEEP_LINES=1000  # 保留行数
+
+# 检查日志文件是否存在
+if [ ! -f "$LOG_FILE" ]; then
+    exit 0
+fi
+
+# 获取文件大小（字节）
+FILE_SIZE=$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+
+# 解析最大大小
+case "$MAX_SIZE" in
+    *MB) MAX_BYTES=$((${MAX_SIZE%MB} * 1024 * 1024)) ;;
+    *KB) MAX_BYTES=$((${MAX_SIZE%KB} * 1024)) ;;
+    *) MAX_BYTES=10485760 ;; # 默认10MB
+esac
+
+# 如果文件超过大小限制，进行清理
+if [ "$FILE_SIZE" -gt "$MAX_BYTES" ]; then
+    echo "[$(date)] 日志文件过大 (${FILE_SIZE} bytes)，开始清理..." >> "$LOG_FILE"
+    # 保留最后KEEP_LINES行
+    tail -n "$KEEP_LINES" "$LOG_FILE" > "${LOG_FILE}.tmp" && mv "${LOG_FILE}.tmp" "$LOG_FILE"
+    echo "[$(date)] 日志清理完成，保留最近 $KEEP_LINES 行" >> "$LOG_FILE"
+fi
+EOF
+
+chmod +x "/usr/local/emhttp/plugins/easy-mihomo/scripts/log_cleanup.sh"
+echo "  ✓ 日志清理脚本已创建"
+
+# 添加定时任务（每天凌晨2点清理）
+echo "  - 正在设置定时清理任务..."
+# 移除旧的定时任务
+crontab -l 2>/dev/null | grep -v "mihomo.*log_cleanup" | crontab - 2>/dev/null || true
+# 添加新的定时任务
+(crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/emhttp/plugins/easy-mihomo/scripts/log_cleanup.sh >/dev/null 2>&1") | crontab - 2>/dev/null || true
+echo "  ✓ 定时清理任务已设置（每天凌晨2点）"
+
 # 根据UI文件处理情况显示不同的完成信息
 if [ "$UI_EXISTS" = true ]; then
   echo "✓ 核心文件已更新，UI文件保持不变"
@@ -162,6 +214,10 @@ if ($cmd === 'restart') {
 if ($cmd === 'clearlog') {
   @file_put_contents($logFile, "");
   $msg = '日志已清空';
+}
+if ($cmd === 'cleanup_log') {
+  $out = shell_exec("bash $scripts/log_cleanup.sh 2>&1");
+  $msg = '日志清理完成: ' . htmlspecialchars($out ?? '');
 }
 if ($cmd === 'select_conf') {
   $name = basename($_POST['name'] ?? '');
@@ -210,6 +266,19 @@ if ($cmd === 'saveconf') {
 $status = shell_exec("bash $scripts/status.sh 2>&1");
 $version = shell_exec("bash $scripts/version.sh 2>&1");
 $logTail = file_exists($logFile) ? trim(shell_exec("tail -n 200 $logFile 2>&1")) : '';
+
+// 获取日志文件信息
+$logSize = file_exists($logFile) ? filesize($logFile) : 0;
+$logSizeFormatted = formatBytes($logSize);
+$logLines = file_exists($logFile) ? count(file($logFile)) : 0;
+
+function formatBytes($size, $precision = 2) {
+    $units = array('B', 'KB', 'MB', 'GB', 'TB');
+    for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++) {
+        $size /= 1024;
+    }
+    return round($size, $precision) . ' ' . $units[$i];
+}
 
 // 处理上传重定向返回的消息
 if (isset($_GET['uploadmsg']) && $_GET['uploadmsg'] !== '') {
@@ -369,11 +438,13 @@ function openFileManager() {
   ?></div>
   <div><b>核心：</b> <?= htmlspecialchars(trim($version ?? 'unknown')) ?></div>
   <div><b>配置：</b> <?= $selectedPath ? htmlspecialchars($selectedPath) : '未选择（请在下方选择）' ?> | <b>二进制：</b> <?= file_exists($binUsb)? htmlspecialchars($binUsb):'缺失' ?></div>
+  <div><b>日志状态：</b> 文件大小: <?= $logSizeFormatted ?> | 总行数: <?= $logLines ?> 行 | 自动清理: 每天凌晨2点</div>
   <div style="margin-top:10px">
     <button onclick="executeAction('start')">启动</button>
     <button onclick="executeAction('stop')">停止</button>
     <button onclick="executeAction('restart')">重启服务</button>
     <button onclick="executeAction('clearlog')">清空日志</button>
+    <button onclick="executeAction('cleanup_log')" style="background:#ffc107;color:#000;">智能清理</button>
     <button onclick="openConsole()">打开控制台</button>
   </div>
 </div>
@@ -666,6 +737,11 @@ echo "  - 清理开机启动配置..."
 sed -i "/^# BEGIN easy-mihomo (do not edit)$/,/^# END easy-mihomo$/d" /boot/config/go 2>/dev/null || true
 rm -f /boot/config/plugins/easy-mihomo/bootstart.enabled
 echo "  ✓ 开机启动配置已清理"
+
+# 清理定时任务
+echo "  - 清理定时清理任务..."
+crontab -l 2>/dev/null | grep -v "mihomo.*log_cleanup" | crontab - 2>/dev/null || true
+echo "  ✓ 定时清理任务已清理"
 
 echo ""
 echo "🎉 Easy-Mihomo 插件卸载完成！"
