@@ -675,96 +675,41 @@ include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
 ]]></INLINE>
 </FILE>
 
-<!-- Dashboard panel -->
-<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/EasyMihomo.Dashboard.page">
+<!-- Dashboard panel - 通过安装包实现 -->
+<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/dashboard.html">
 <INLINE><![CDATA[
-<?php
-$baseRun = '/usr/local/emhttp/plugins/easy-mihomo';
-$scripts = $baseRun . '/scripts';
-$logFile = '/var/log/mihomo.log';
-
-// 处理仪表板操作
-$cmd = $_GET['cmd'] ?? '';
-if ($cmd === 'start') {
-  $out = shell_exec("bash $scripts/start.sh 2>&1");
-  echo json_encode(['status' => 'success', 'message' => $out]);
-  exit;
-}
-if ($cmd === 'stop') {
-  $out = shell_exec("bash $scripts/stop.sh 2>&1");
-  echo json_encode(['status' => 'success', 'message' => $out]);
-  exit;
-}
-if ($cmd === 'restart') {
-  $out = shell_exec("bash $scripts/restart.sh 2>&1");
-  echo json_encode(['status' => 'success', 'message' => $out]);
-  exit;
-}
-
-// 获取服务状态
-$status = shell_exec("bash $scripts/status.sh 2>&1");
-$version = shell_exec("bash $scripts/version.sh 2>&1");
-
-// 解析状态
-$isRunning = strpos($status, 'running') !== false;
-$pid = '';
-if (preg_match('/pid=(\d+)/', $status, $matches)) {
-  $pid = $matches[1];
-}
-
-// 获取日志信息
-$logSize = file_exists($logFile) ? filesize($logFile) : 0;
-$logLines = file_exists($logFile) ? count(file($logFile)) : 0;
-$logTail = file_exists($logFile) ? trim(shell_exec("tail -n 3 $logFile 2>&1")) : '';
-
-function formatBytes($size, $precision = 2) {
-    $units = array('B', 'KB', 'MB', 'GB', 'TB');
-    for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++) {
-        $size /= 1024;
-    }
-    return round($size, $precision) . ' ' . $units[$i];
-}
-?>
-<div class="panel">
+<div id="mihomo-dashboard" class="panel">
   <div class="panel-header">
     <h3>🚀 Mihomo 代理服务</h3>
-    <div class="panel-status <?= $isRunning ? 'status-running' : 'status-stopped' ?>">
-      <?= $isRunning ? '🟢 运行中' : '🔴 已停止' ?>
-      <?= $pid ? " (PID: $pid)" : '' ?>
-    </div>
+    <div id="mihomo-status" class="panel-status">检查中...</div>
   </div>
   
   <div class="panel-content">
     <div class="info-row">
       <span class="info-label">版本:</span>
-      <span class="info-value"><?= htmlspecialchars(trim($version ?? 'unknown')) ?></span>
+      <span id="mihomo-version" class="info-value">检查中...</span>
     </div>
     
     <div class="info-row">
       <span class="info-label">日志:</span>
-      <span class="info-value"><?= formatBytes($logSize) ?> (<?= $logLines ?> 行)</span>
+      <span id="mihomo-log-info" class="info-value">检查中...</span>
     </div>
     
     <div class="button-group">
-      <?php if ($isRunning): ?>
-        <button class="btn btn-stop" onclick="mihomoAction('stop')">停止</button>
-        <button class="btn btn-restart" onclick="mihomoAction('restart')">重启</button>
-      <?php else: ?>
-        <button class="btn btn-start" onclick="mihomoAction('start')">启动</button>
-      <?php endif; ?>
+      <button id="mihomo-start" class="btn btn-start" onclick="mihomoAction('start')" style="display:none;">启动</button>
+      <button id="mihomo-stop" class="btn btn-stop" onclick="mihomoAction('stop')" style="display:none;">停止</button>
+      <button id="mihomo-restart" class="btn btn-restart" onclick="mihomoAction('restart')" style="display:none;">重启</button>
     </div>
     
-    <?php if ($logTail): ?>
-    <div class="log-section">
+    <div id="mihomo-log" class="log-section" style="display:none;">
       <div class="log-header">最近日志:</div>
-      <div class="log-content"><?= htmlspecialchars($logTail) ?></div>
+      <div id="mihomo-log-content" class="log-content"></div>
     </div>
-    <?php endif; ?>
   </div>
 </div>
 
 <style>
-.panel {
+#mihomo-dashboard {
   background: #f8f9fa;
   border: 1px solid #dee2e6;
   border-radius: 6px;
@@ -882,21 +827,137 @@ function formatBytes($size, $precision = 2) {
 
 <script>
 function mihomoAction(action) {
-  fetch('?cmd=' + action)
+  fetch('/plugins/easy-mihomo/action.php?cmd=' + action)
     .then(response => response.json())
     .then(data => {
       if (data.status === 'success') {
-        setTimeout(() => location.reload(), 1000);
+        setTimeout(() => updateMihomoStatus(), 1000);
       }
     })
     .catch(error => console.error('Error:', error));
 }
 
-// 自动刷新状态（每30秒）
-setInterval(() => {
-  location.reload();
-}, 30000);
+function updateMihomoStatus() {
+  fetch('/plugins/easy-mihomo/status.php')
+    .then(response => response.json())
+    .then(data => {
+      const statusEl = document.getElementById('mihomo-status');
+      const versionEl = document.getElementById('mihomo-version');
+      const logInfoEl = document.getElementById('mihomo-log-info');
+      const logEl = document.getElementById('mihomo-log');
+      const logContentEl = document.getElementById('mihomo-log-content');
+      
+      // 更新状态
+      if (data.running) {
+        statusEl.textContent = '🟢 运行中' + (data.pid ? ' (PID: ' + data.pid + ')' : '');
+        statusEl.className = 'panel-status status-running';
+        document.getElementById('mihomo-start').style.display = 'none';
+        document.getElementById('mihomo-stop').style.display = 'inline-block';
+        document.getElementById('mihomo-restart').style.display = 'inline-block';
+      } else {
+        statusEl.textContent = '🔴 已停止';
+        statusEl.className = 'panel-status status-stopped';
+        document.getElementById('mihomo-start').style.display = 'inline-block';
+        document.getElementById('mihomo-stop').style.display = 'none';
+        document.getElementById('mihomo-restart').style.display = 'none';
+      }
+      
+      // 更新版本
+      versionEl.textContent = data.version || 'unknown';
+      
+      // 更新日志信息
+      logInfoEl.textContent = data.logSize + ' (' + data.logLines + ' 行)';
+      
+      // 更新日志内容
+      if (data.logTail) {
+        logContentEl.textContent = data.logTail;
+        logEl.style.display = 'block';
+      } else {
+        logEl.style.display = 'none';
+      }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// 页面加载时更新状态
+document.addEventListener('DOMContentLoaded', function() {
+  updateMihomoStatus();
+  
+  // 每30秒自动刷新
+  setInterval(updateMihomoStatus, 30000);
+});
 </script>
+]]></INLINE>
+</FILE>
+
+<!-- 状态API -->
+<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/status.php">
+<INLINE><![CDATA[
+<?php
+header('Content-Type: application/json');
+
+$baseRun = '/usr/local/emhttp/plugins/easy-mihomo';
+$scripts = $baseRun . '/scripts';
+$logFile = '/var/log/mihomo.log';
+
+// 获取服务状态
+$status = shell_exec("bash $scripts/status.sh 2>&1");
+$version = shell_exec("bash $scripts/version.sh 2>&1");
+
+// 解析状态
+$isRunning = strpos($status, 'running') !== false;
+$pid = '';
+if (preg_match('/pid=(\d+)/', $status, $matches)) {
+  $pid = $matches[1];
+}
+
+// 获取日志信息
+$logSize = file_exists($logFile) ? filesize($logFile) : 0;
+$logLines = file_exists($logFile) ? count(file($logFile)) : 0;
+$logTail = file_exists($logFile) ? trim(shell_exec("tail -n 3 $logFile 2>&1")) : '';
+
+function formatBytes($size, $precision = 2) {
+    $units = array('B', 'KB', 'MB', 'GB', 'TB');
+    for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++) {
+        $size /= 1024;
+    }
+    return round($size, $precision) . ' ' . $units[$i];
+}
+
+echo json_encode([
+    'running' => $isRunning,
+    'pid' => $pid,
+    'version' => trim($version ?? 'unknown'),
+    'logSize' => formatBytes($logSize),
+    'logLines' => $logLines,
+    'logTail' => $logTail
+]);
+?>
+]]></INLINE>
+</FILE>
+
+<!-- 操作API -->
+<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/action.php">
+<INLINE><![CDATA[
+<?php
+header('Content-Type: application/json');
+
+$baseRun = '/usr/local/emhttp/plugins/easy-mihomo';
+$scripts = $baseRun . '/scripts';
+
+$cmd = $_GET['cmd'] ?? '';
+$out = '';
+
+if ($cmd === 'start') {
+  $out = shell_exec("bash $scripts/start.sh 2>&1");
+} elseif ($cmd === 'stop') {
+  $out = shell_exec("bash $scripts/stop.sh 2>&1");
+} elseif ($cmd === 'restart') {
+  $out = shell_exec("bash $scripts/restart.sh 2>&1");
+}
+
+echo json_encode(['status' => 'success', 'message' => $out]);
+?>
 ]]></INLINE>
 </FILE>
 
