@@ -710,74 +710,66 @@ function formatBytes($size, $precision = 2) {
     return round($size, $precision) . ' ' . $units[$i];
 }
 ?>
-<div class="panel">
-  <div class="panel-header">
-    <h3>🚀 Mihomo 代理服务</h3>
-    <div class="panel-status <?= $isRunning ? 'status-running' : 'status-stopped' ?>">
-      <?= $isRunning ? '🟢 运行中' : '🔴 已停止' ?>
-      <?= $pid ? " (PID: $pid)" : '' ?>
-    </div>
-  </div>
-  
-  <div class="panel-content">
-    <div class="info-row">
-      <span class="info-label">版本:</span>
-      <span class="info-value"><?= htmlspecialchars(trim($version ?? 'unknown')) ?></span>
-    </div>
-    
-    <div class="info-row">
-      <span class="info-label">日志:</span>
-      <span class="info-value"><?= formatBytes($logSize) ?> (<?= $logLines ?> 行)</span>
-    </div>
-    
-    <div class="button-group">
-      <?php if ($isRunning): ?>
-        <button class="btn btn-stop" onclick="mihomoAction('stop')">停止</button>
-        <button class="btn btn-restart" onclick="mihomoAction('restart')">重启</button>
-      <?php else: ?>
-        <button class="btn btn-start" onclick="mihomoAction('start')">启动</button>
-      <?php endif; ?>
-    </div>
-    
-    <?php if ($logTail): ?>
-    <div class="log-section">
-      <div class="log-header">最近日志:</div>
-      <div class="log-content"><?= htmlspecialchars($logTail) ?></div>
-    </div>
-    <?php endif; ?>
-  </div>
-</div>
+<table id='db-box1' class='dash_mihomo dashboard box1' style='display:none'>
+    <thead sort='953'><tr class='hidden'><td></td><td colspan='3'></td><td></td></tr></thead>
+    <tbody sort='953' class='sortable'>
+        <tr>
+            <td></td>
+            <td class='next' colspan='3'>
+                <i class='icon-network'></i>
+                <div class='section'>Mihomo 代理服务<br>
+                    <span id='mihomo-status' class='mihomo-status <?= $isRunning ? 'status-running' : 'status-stopped' ?>'>
+                        <?= $isRunning ? '🟢 运行中' : '🔴 已停止' ?>
+                        <?= $pid ? " (PID: $pid)" : '' ?>
+                    </span>
+                </div>
+                <i class='fa fa-fw chevron mt0' id='dash_mihomo_toggle' onclick='toggleChevron("dash_mihomo_toggle",0)'></i>
+                <a href='/Settings/EasyMihomo.Main' id='dash_mihomo_settings' title='Go to Mihomo settings'><i class='fa fa-fw fa-cog chevron mt0'></i></a>
+                <br><br>
+            </td>
+            <td></td>
+        </tr>
+        <tr class="dash_mihomo_toggle mihomo-enviro">
+            <td></td>
+            <td>版本</td>
+            <td colspan="2"><?= htmlspecialchars(trim($version ?? 'unknown')) ?></td>
+            <td></td>
+        </tr>
+        <tr class="dash_mihomo_toggle mihomo-enviro">
+            <td></td>
+            <td>日志</td>
+            <td colspan="2"><?= formatBytes($logSize) ?> (<?= $logLines ?> 行)</td>
+            <td></td>
+        </tr>
+        <tr class="dash_mihomo_toggle mihomo-enviro">
+            <td></td>
+            <td>操作</td>
+            <td colspan="2">
+                <?php if ($isRunning): ?>
+                    <button class='btn btn-stop' onclick="mihomoAction('stop')" style='margin-right:8px;padding:4px 8px;font-size:11px;'>停止</button>
+                    <button class='btn btn-restart' onclick="mihomoAction('restart')" style='margin-right:8px;padding:4px 8px;font-size:11px;'>重启</button>
+                <?php else: ?>
+                    <button class='btn btn-start' onclick="mihomoAction('start')" style='margin-right:8px;padding:4px 8px;font-size:11px;'>启动</button>
+                <?php endif; ?>
+            </td>
+            <td></td>
+        </tr>
+        <?php if ($logTail): ?>
+        <tr class="dash_mihomo_toggle mihomo-enviro">
+            <td></td>
+            <td>最近日志</td>
+            <td colspan="2" style='font-family:monospace;font-size:10px;max-height:60px;overflow-y:auto;'><?= htmlspecialchars($logTail) ?></td>
+            <td></td>
+        </tr>
+        <?php endif; ?>
+    </tbody>
+</table>
 
 <style>
-.panel {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  margin: 10px 0;
-  font-family: Arial, sans-serif;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 15px;
-  background: #e9ecef;
-  border-bottom: 1px solid #dee2e6;
-  border-radius: 6px 6px 0 0;
-}
-
-.panel-header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: bold;
-  color: #333;
-}
-
-.panel-status {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+.mihomo-status {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
   font-weight: bold;
 }
 
@@ -791,37 +783,10 @@ function formatBytes($size, $precision = 2) {
   color: #721c24;
 }
 
-.panel-content {
-  padding: 15px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 12px;
-}
-
-.info-label {
-  font-weight: bold;
-  color: #666;
-}
-
-.info-value {
-  color: #333;
-}
-
-.button-group {
-  margin: 12px 0;
-}
-
 .btn {
-  padding: 6px 12px;
-  margin-right: 8px;
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
   cursor: pointer;
-  font-size: 11px;
   font-weight: bold;
 }
 
@@ -838,30 +803,6 @@ function formatBytes($size, $precision = 2) {
 .btn-restart {
   background: #ffc107;
   color: #000;
-}
-
-.log-section {
-  margin-top: 12px;
-  background: #f1f3f4;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 8px;
-}
-
-.log-header {
-  font-size: 11px;
-  font-weight: bold;
-  color: #666;
-  margin-bottom: 4px;
-}
-
-.log-content {
-  font-family: monospace;
-  font-size: 10px;
-  color: #333;
-  white-space: pre-wrap;
-  max-height: 60px;
-  overflow-y: auto;
 }
 </style>
 
