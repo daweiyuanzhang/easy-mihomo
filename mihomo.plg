@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.1">
+<!ENTITY version   "1.0.2">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,6 +14,14 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.2  仪表板集成版
+- 新增仪表板面板显示
+- 支持在 Unraid 主仪表板查看服务状态
+- 一键启动/停止/重启功能
+- 实时显示服务状态和进程信息
+- 显示最近日志摘要
+- 自动刷新状态（30秒间隔）
+
 1.0.1  日志管理增强版
 - 新增自动日志清理功能
 - 支持定期清理（每天凌晨2点）
@@ -664,6 +672,190 @@ Tabs="false"
 <?php
 include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
 ?>
+]]></INLINE>
+</FILE>
+
+<!-- Dashboard panel -->
+<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/EasyMihomo.Dashboard.page">
+<INLINE><![CDATA[
+<?php
+$baseRun = '/usr/local/emhttp/plugins/easy-mihomo';
+$scripts = $baseRun . '/scripts';
+$logFile = '/var/log/mihomo.log';
+
+// 处理仪表板操作
+$cmd = $_GET['cmd'] ?? '';
+if ($cmd === 'start') {
+  $out = shell_exec("bash $scripts/start.sh 2>&1");
+  echo json_encode(['status' => 'success', 'message' => $out]);
+  exit;
+}
+if ($cmd === 'stop') {
+  $out = shell_exec("bash $scripts/stop.sh 2>&1");
+  echo json_encode(['status' => 'success', 'message' => $out]);
+  exit;
+}
+if ($cmd === 'restart') {
+  $out = shell_exec("bash $scripts/restart.sh 2>&1");
+  echo json_encode(['status' => 'success', 'message' => $out]);
+  exit;
+}
+
+// 获取服务状态
+$status = shell_exec("bash $scripts/status.sh 2>&1");
+$version = shell_exec("bash $scripts/version.sh 2>&1");
+
+// 解析状态
+$isRunning = strpos($status, 'running') !== false;
+$pid = '';
+if (preg_match('/pid=(\d+)/', $status, $matches)) {
+  $pid = $matches[1];
+}
+
+// 获取日志信息
+$logSize = file_exists($logFile) ? filesize($logFile) : 0;
+$logLines = file_exists($logFile) ? count(file($logFile)) : 0;
+$logTail = file_exists($logFile) ? trim(shell_exec("tail -n 5 $logFile 2>&1")) : '';
+
+function formatBytes($size, $precision = 2) {
+    $units = array('B', 'KB', 'MB', 'GB', 'TB');
+    for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++) {
+        $size /= 1024;
+    }
+    return round($size, $precision) . ' ' . $units[$i];
+}
+?>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mihomo Dashboard</title>
+  <meta charset="utf-8">
+  <style>
+    .mihomo-dashboard {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+      font-family: Arial, sans-serif;
+    }
+    .mihomo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .mihomo-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+    }
+    .mihomo-status {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .status-running {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status-stopped {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .mihomo-info {
+      font-size: 12px;
+      color: #666;
+      margin: 5px 0;
+    }
+    .mihomo-buttons {
+      margin-top: 10px;
+    }
+    .mihomo-btn {
+      padding: 6px 12px;
+      margin-right: 8px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .btn-start {
+      background: #28a745;
+      color: white;
+    }
+    .btn-stop {
+      background: #dc3545;
+      color: white;
+    }
+    .btn-restart {
+      background: #ffc107;
+      color: #000;
+    }
+    .mihomo-log {
+      background: #f1f3f4;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 11px;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+  </style>
+  <script>
+    function mihomoAction(action) {
+      fetch('?cmd=' + action)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'success') {
+            setTimeout(() => location.reload(), 1000);
+          }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+    
+    // 自动刷新状态（每30秒）
+    setInterval(() => {
+      location.reload();
+    }, 30000);
+  </script>
+</head>
+<body>
+  <div class="mihomo-dashboard">
+    <div class="mihomo-header">
+      <div class="mihomo-title">🚀 Mihomo 代理服务</div>
+      <div class="mihomo-status <?= $isRunning ? 'status-running' : 'status-stopped' ?>">
+        <?= $isRunning ? '🟢 运行中' : '🔴 已停止' ?>
+        <?= $pid ? " (PID: $pid)" : '' ?>
+      </div>
+    </div>
+    
+    <div class="mihomo-info">
+      <strong>版本:</strong> <?= htmlspecialchars(trim($version ?? 'unknown')) ?><br>
+      <strong>日志:</strong> <?= formatBytes($logSize) ?> (<?= $logLines ?> 行)
+    </div>
+    
+    <div class="mihomo-buttons">
+      <?php if ($isRunning): ?>
+        <button class="mihomo-btn btn-stop" onclick="mihomoAction('stop')">停止</button>
+        <button class="mihomo-btn btn-restart" onclick="mihomoAction('restart')">重启</button>
+      <?php else: ?>
+        <button class="mihomo-btn btn-start" onclick="mihomoAction('start')">启动</button>
+      <?php endif; ?>
+    </div>
+    
+    <?php if ($logTail): ?>
+    <div class="mihomo-log">
+      <strong>最近日志:</strong><br>
+      <?= htmlspecialchars($logTail) ?>
+    </div>
+    <?php endif; ?>
+  </div>
+</body>
+</html>
 ]]></INLINE>
 </FILE>
 
