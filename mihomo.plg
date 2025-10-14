@@ -723,6 +723,21 @@ include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
   background: #ffc107;
   color: #000;
 }
+/* Layout & responsive tweaks for Unraid dashboard */
+.dash_mihomo .section { display: inline-block; vertical-align: middle; }
+.dash_mihomo td { white-space: nowrap; vertical-align: top; }
+.dash_mihomo .log-tail { font-family: monospace; font-size: 10px; max-height: 60px; overflow-y: auto; }
+.dash_mihomo .meta { color: #555; font-size: 10px; }
+/* Make buttons compact on dashboard */
+.dash_mihomo .btn { padding: 4px 8px; font-size: 11px; }
+/* Width hint for box1 so it doesn't overflow on small screens */
+@media (max-width: 1400px) {
+  .dash_mihomo .mihomo-status { font-size: 9px; }
+  .dash_mihomo .btn { padding: 3px 7px; font-size: 10px; }
+}
+@media (max-width: 1000px) {
+  .dash_mihomo td { white-space: normal; }
+}
 ]]></INLINE>
 </FILE>
 
@@ -733,17 +748,70 @@ function mihomoAction(action) {
   fetch('/plugins/easy-mihomo/action.php?cmd=' + action)
     .then(response => response.json())
     .then(data => {
-      if (data.status === 'success') {
-        setTimeout(() => location.reload(), 1000);
+      if (data && data.status === 'success') {
+        setTimeout(() => {
+          try { mihomoStatus(); } catch (e) { /* ignore */ }
+        }, 500);
       }
     })
     .catch(error => console.error('Error:', error));
 }
 
-// 每30秒自动刷新
-setInterval(() => {
-  location.reload();
-}, 30000);
+// 拉取状态并更新仪表板 DOM
+function mihomoStatus() {
+  fetch('/plugins/easy-mihomo/status.php?_=' + Date.now())
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('bad status')))
+    .then(data => {
+      if (!data) return;
+      // 状态与PID
+      var statusEl = document.getElementById('mihomo-status');
+      if (statusEl) {
+        var running = !!data.running;
+        var pidText = data.pid ? (' (PID: ' + data.pid + ')') : '';
+        statusEl.textContent = (running ? '🟢 运行中' : '🔴 已停止') + pidText;
+        statusEl.classList.remove('status-running','status-stopped');
+        statusEl.classList.add(running ? 'status-running' : 'status-stopped');
+      }
+      // 版本
+      var verEl = document.getElementById('mihomo-version');
+      if (verEl && typeof data.version === 'string') verEl.textContent = data.version.trim();
+      // 日志信息
+      var sizeEl = document.getElementById('mihomo-logsize');
+      if (sizeEl && typeof data.logSize === 'string') sizeEl.textContent = data.logSize;
+      var linesEl = document.getElementById('mihomo-loglines');
+      if (linesEl && (typeof data.logLines === 'number' || typeof data.logLines === 'string')) linesEl.textContent = data.logLines;
+      var tailEl = document.getElementById('mihomo-logtail');
+      if (tailEl && typeof data.logTail === 'string') tailEl.textContent = data.logTail;
+    })
+    .catch(() => {/* ignore network errors on dashboard */});
+}
+
+// 仪表板注入与初始化（对齐 Unraid 行为）
+function mihomoDash() {
+  var box = document.getElementById('db-box7');
+  if (box) box.style.display = '';
+  // 若存在 jQuery 与全局辅助函数，则恢复折叠与排序
+  try {
+    if (window.$ && typeof toggleView === 'function' && typeof sortTable === 'function') {
+      toggleView('dash_mihomo_toggle', true);
+      sortTable($('#db-box7'), $.cookie('db-box7'));
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// 页面就绪初始化
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function(){
+    mihomoDash();
+    mihomoStatus();
+    // 每30秒局部刷新
+    setInterval(mihomoStatus, 30000);
+  });
+} else {
+  mihomoDash();
+  mihomoStatus();
+  setInterval(mihomoStatus, 30000);
+}
 ]]></INLINE>
 </FILE>
 
@@ -787,17 +855,16 @@ function formatBytes($size, $precision = 2) {
     @import url("/plugins/easy-mihomo/css/style.css");
 </style>
 
-<table id='db-box1' class='dash_mihomo dashboard box1' style='display:none'>
-    <thead sort='955'><tr class='hidden'><td></td><td colspan='3'></td><td></td></tr></thead>
-    <tbody sort='955' class='sortable'>
+<table id='db-box7' class='dash_mihomo dashboard box1' style='display:none'>
+    <thead sort='957'><tr class='hidden'><td></td><td colspan='3'></td><td></td></tr></thead>
+    <tbody sort='957' class='sortable'>
         <tr>
             <td></td>
             <td class='next' colspan='3'>
                 <i class='icon-network'></i>
                 <div class='section'>Mihomo 代理服务<br>
                     <span id='mihomo-status' class='mihomo-status <?= $isRunning ? 'status-running' : 'status-stopped' ?>'>
-                        <?= $isRunning ? '🟢 运行中' : '🔴 已停止' ?>
-                        <?= $pid ? " (PID: $pid)" : '' ?>
+                        <?= $isRunning ? '🟢 运行中' : '🔴 已停止' ?><?= $pid ? " (PID: $pid)" : '' ?>
                     </span>
                 </div>
                 <i class='fa fa-fw chevron mt0' id='dash_mihomo_toggle' onclick='toggleChevron("dash_mihomo_toggle",0)'></i>
@@ -809,13 +876,13 @@ function formatBytes($size, $precision = 2) {
         <tr class="dash_mihomo_toggle mihomo-enviro">
             <td></td>
             <td>版本</td>
-            <td colspan="2"><?= htmlspecialchars(trim($version ?? 'unknown')) ?></td>
+            <td colspan="2"><span id="mihomo-version"><?= htmlspecialchars(trim($version ?? 'unknown')) ?></span></td>
             <td></td>
         </tr>
         <tr class="dash_mihomo_toggle mihomo-enviro">
             <td></td>
             <td>日志</td>
-            <td colspan="2"><?= formatBytes($logSize) ?> (<?= $logLines ?> 行)</td>
+            <td colspan="2"><span id="mihomo-logsize"><?= formatBytes($logSize) ?></span> (<span id="mihomo-loglines"><?= $logLines ?></span> 行)</td>
             <td></td>
         </tr>
         <tr class="dash_mihomo_toggle mihomo-enviro">
@@ -831,14 +898,12 @@ function formatBytes($size, $precision = 2) {
             </td>
             <td></td>
         </tr>
-        <?php if ($logTail): ?>
         <tr class="dash_mihomo_toggle mihomo-enviro">
             <td></td>
             <td>最近日志</td>
-            <td colspan="2" style='font-family:monospace;font-size:10px;max-height:60px;overflow-y:auto;'><?= htmlspecialchars($logTail) ?></td>
+            <td colspan="2" class='log-tail'><pre id="mihomo-logtail" style="white-space:pre-wrap;word-break:break-word;margin:0;"><?= htmlspecialchars($logTail) ?></pre></td>
             <td></td>
         </tr>
-        <?php endif; ?>
     </tbody>
 </table>
 
