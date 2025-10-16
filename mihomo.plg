@@ -21,6 +21,11 @@
 - 添加日志状态监控显示
 - 新增手动智能清理按钮
 - 优化日志文件大小管理
+- 改进配置选择体验，支持自动保存
+- 新增弹出式配置编辑器，提供更大编辑空间
+- 优化界面布局，操作按钮更合理
+- 改进下载进度显示，支持自动消失提示
+- 更新核心版本到 v1.19.15
 
 1.0.0  初始版本发布
 - 支持基本的代理功能
@@ -44,13 +49,8 @@ mkdir -p /boot/config/plugins/easy-mihomo
 <FILE Run="/bin/bash">
 <INLINE><![CDATA[
 set -e
-mkdir -p /boot/config/plugins/easy-mihomo
-mkdir -p /usr/local/emhttp/plugins/easy-mihomo/scripts
-
 # 从源目录复制所有文件
 echo "正在创建目录结构..."
-mkdir -p /boot/config/plugins/easy-mihomo
-mkdir -p /usr/local/emhttp/plugins/easy-mihomo/scripts
 
 # 停止正在运行的mihomo服务
 echo "正在停止mihomo服务..."
@@ -63,71 +63,7 @@ else
 fi
 
 # 从GitHub下载并安装文件
-echo "正在从GitHub下载并安装文件..."
-
-# 创建临时下载目录
-DOWNLOAD_DIR="/tmp/mihomo-download"
-mkdir -p "$DOWNLOAD_DIR"
-
-# GitHub仓库URL
-GITHUB_BASE="https://raw.githubusercontent.com/wlaosj/easy-mihomo/main"
-
-# 下载mihomo核心文件
-echo "  - 正在下载 mihomo 核心文件..."
-if wget -q "$GITHUB_BASE/mihomo-linux-amd64-v3-go123-v1.19.14.gz" -O "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz"; then
-  echo "  ✓ mihomo 核心文件下载完成"
-  
-  # 解压mihomo二进制文件
-  echo "  - 正在解压 mihomo 核心..."
-  MIHOME_TMP="/tmp/mihomo-latest"
-  
-  if gunzip -c "$DOWNLOAD_DIR/mihomo-linux-amd64-v3-go123-v1.19.14.gz" > "$MIHOME_TMP" 2>/dev/null; then
-    # 解压成功，复制到目标位置
-    # 确保目标目录存在
-    mkdir -p /usr/local/bin
-    # 强制覆盖现有文件
-    cp -f "$MIHOME_TMP" "/usr/local/bin/mihomo"
-    chmod +x "/usr/local/bin/mihomo"
-    # 备份到插件目录
-    mkdir -p /boot/config/plugins/easy-mihomo
-    cp -f "$MIHOME_TMP" "/boot/config/plugins/easy-mihomo/mihomo"
-    rm -f "$MIHOME_TMP"
-    echo "  ✓ mihomo 核心解压并安装完成"
-  else
-    echo "  ❌ mihomo 核心解压失败"
-    rm -f "$MIHOME_TMP"
-    exit 1
-  fi
-else
-  echo "  ❌ mihomo 核心文件下载失败"
-  exit 1
-fi
-
-# 检查UI文件是否已存在
-UI_DIR="/boot/config/plugins/easy-mihomo/ui"
-UI_EXISTS=false
-
-if [ -d "$UI_DIR" ] && [ "$(ls -A "$UI_DIR" 2>/dev/null)" ]; then
-  echo "  - 检测到UI文件已存在，跳过UI下载和解压"
-  UI_EXISTS=true
-else
-  echo "  - 正在下载UI文件..."
-  if wget -q "$GITHUB_BASE/ui.tar.gz" -O "$DOWNLOAD_DIR/ui.tar.gz"; then
-    echo "  ✓ UI文件下载完成"
-    
-    # 解压UI文件
-    echo "  - 正在解压UI文件（解压有点慢，请耐心等待，切勿关闭安装窗口）..."
-    mkdir -p "$UI_DIR"
-    tar -xzf "$DOWNLOAD_DIR/ui.tar.gz" -C "$UI_DIR"
-    echo "  ✓ UI文件解压完成"
-  else
-    echo "  ❌ UI文件下载失败"
-    exit 1
-  fi
-fi
-
-# 清理临时文件
-rm -rf "$DOWNLOAD_DIR"
+echo "跳过自动下载核心与UI：将由插件页面提供手动下载/更新入口"
 
 # 创建定期日志清理脚本
 echo "  - 正在创建日志清理脚本..."
@@ -173,12 +109,8 @@ crontab -l 2>/dev/null | grep -v "mihomo.*log_cleanup" | crontab - 2>/dev/null |
 (crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/emhttp/plugins/easy-mihomo/scripts/log_cleanup.sh >/dev/null 2>&1") | crontab - 2>/dev/null || true
 echo "  ✓ 定时清理任务已设置（每天凌晨2点）"
 
-# 根据UI文件处理情况显示不同的完成信息
-if [ "$UI_EXISTS" = true ]; then
-  echo "✓ 核心文件已更新，UI文件保持不变"
-else
-  echo "✓ 所有文件已从GitHub下载并安装完成"
-fi
+# 安装阶段完成（核心/UI 下载改为页面手动触发）
+echo "✓ 插件基础文件部署完成（未自动下载核心与UI）"
 ]]></INLINE>
 </FILE>
 
@@ -189,16 +121,30 @@ fi
 $baseRun = '/usr/local/emhttp/plugins/easy-mihomo';
 $scripts = $baseRun . '/scripts';
 $logFile = '/var/log/mihomo.log';
-$binUsb  = '/boot/config/plugins/easy-mihomo/mihomo';
 $confDir = '/boot/config/plugins/easy-mihomo';
 $selectFile = $confDir . '/selected.conf';
 
-// 预先解析已选择的配置，供后续 saveconf 与渲染使用
-$selectedName = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
-$selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($confDir . '/' . $selectedName) : '';
+// 进度文件目录
+$progressDir = '/var/tmp/easy-mihomo-progress';
+@mkdir($progressDir, 0777, true);
 
 $cmd = isset($_POST['cmd']) ? $_POST['cmd'] : (isset($_GET['cmd']) ? $_GET['cmd'] : '');
 $msg = '';
+
+// 先处理命令，再读取配置状态
+
+// 早期拦截：进度轮询，直接输出文本并退出
+if ($cmd === 'get_progress') {
+  $target = $_GET['target'] ?? $_POST['target'] ?? '';
+  $file = '';
+  if ($target === 'core') $file = $progressDir . '/core.status';
+  if ($target === 'ui')   $file = $progressDir . '/ui.status';
+  header('Content-Type: text/plain; charset=utf-8');
+  if ($file && is_file($file)) {
+    echo @file_get_contents($file);
+  }
+  exit;
+}
 if ($cmd === 'start') {
   $out = shell_exec("bash $scripts/start.sh 2>&1");
   $msg = htmlspecialchars($out ?? '');
@@ -218,6 +164,26 @@ if ($cmd === 'clearlog') {
 if ($cmd === 'cleanup_log') {
   $out = shell_exec("bash $scripts/log_cleanup.sh 2>&1");
   $msg = '日志清理完成: ' . htmlspecialchars($out ?? '');
+}
+if ($cmd === 'start_download') {
+  $target = $_GET['target'] ?? $_POST['target'] ?? '';
+  if ($target === 'core') {
+    @unlink($progressDir . '/core.status');
+    $out = shell_exec("nohup bash $scripts/download_core.sh --progress >$progressDir/core.log 2>&1 & echo $!");
+    $msg = '核心下载任务已启动 PID: ' . htmlspecialchars(trim($out));
+  } elseif ($target === 'ui') {
+    @unlink($progressDir . '/ui.status');
+    $out = shell_exec("nohup bash $scripts/download_ui.sh --progress >$progressDir/ui.log 2>&1 & echo $!");
+    $msg = 'UI 下载任务已启动 PID: ' . htmlspecialchars(trim($out));
+  } else {
+    $msg = '未知的下载目标';
+  }
+  // 若为异步请求（ajax=1），仅返回纯文本并退出，避免整页HTML回填到消息区域
+  if ((isset($_GET['ajax']) && $_GET['ajax'] === '1') || (isset($_POST['ajax']) && $_POST['ajax'] === '1')) {
+    header('Content-Type: text/plain; charset=utf-8');
+    echo $msg;
+    exit;
+  }
 }
 if ($cmd === 'select_conf') {
   $name = basename($_POST['name'] ?? '');
@@ -287,7 +253,6 @@ if (isset($_GET['uploadmsg']) && $_GET['uploadmsg'] !== '') {
 // 仅在输出 HTML 前设置内容类型，避免影响上传重定向
 header('Content-Type: text/html; charset=utf-8');
 
-$confText = ($selectedPath && file_exists($selectedPath)) ? @file_get_contents($selectedPath) : '';
 $available = array_values(array_filter(scandir($confDir) ?: [], function($f) use ($confDir){
   return is_file($confDir . '/' . $f) && preg_match('/\.(ya?ml)$/i', $f);
 }));
@@ -346,10 +311,18 @@ if ($cmd === 'set_bootstart') {
 }
 $bootstartOn = file_exists($bootFlag);
 
+// 现在读取已选择的配置（在所有命令处理完成后）
+$selectedName = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
+$selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($confDir . '/' . $selectedName) : '';
+
+// 读取配置内容用于编辑
+$confText = ($selectedPath && file_exists($selectedPath)) ? @file_get_contents($selectedPath) : '';
+
 // 检查安装状态
 $installStatus = '';
 $binExists = file_exists('/usr/local/bin/mihomo');
-$uiExists = is_dir('/boot/config/plugins/easy-mihomo/ui');
+$binUdiskExists = file_exists('/boot/config/plugins/easy-mihomo/mihomo');
+$uiExists = file_exists('/boot/config/plugins/easy-mihomo/zashboard.zip');
 
 // 检查插件目录下是否有任何配置文件
 $confDir = '/boot/config/plugins/easy-mihomo';
@@ -366,11 +339,11 @@ if (is_dir($confDir)) {
 
 // 只检查核心组件，配置文件由用户自己上传
 if (!$binExists) {
-  $installStatus = '<div class="error">❌ 缺少二进制文件，请重新安装插件</div>';
+  $installStatus = '<div class="error">❌ 缺少二进制文件，请点击上方“下载/更新核心”按钮安装</div>';
 } elseif (!$uiExists) {
-  $installStatus = '<div class="warning">⚠️ 缺少UI文件，部分功能可能不可用</div>';
+  $installStatus = '<div class="warning">⚠️ 未检测到 UI 压缩包，请点击上方“下载/更新UI”获取（不影响按配置自定义 external-ui）</div>';
 } elseif (!$confExists) {
-  $installStatus = '<div class="success">💡 请上传配置文件到插件目录，或使用下方文件管理器</div>';
+  $installStatus = '<div class="success">💡 尚未发现配置文件，请上传到插件目录，或使用下方“打开文件管理器”</div>';
 }
 ?>
 <!DOCTYPE html>
@@ -414,101 +387,202 @@ function openFileManager() {
   window.open(fileManagerUrl, '_blank');
 }
 
+function startDownload(target, btn) {
+  try {
+    if (btn) {
+      btn.dataset.oldText = btn.innerText;
+      btn.disabled = true;
+      btn.innerText = '下载中...';
+    }
+    var box = document.getElementById('download-msg');
+    if (box) box.innerText = '已发起下载任务，正在准备...';
+  } catch (e) {}
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/plugins/easy-mihomo/api.php?cmd=start_download&target=' + encodeURIComponent(target));
+  xhr.onload = function(){
+    if (xhr.status === 200) {
+      var box = document.getElementById('download-msg');
+      if (box) box.innerText = (xhr.responseText || '').trim() || '任务已启动';
+    }
+    try { if (btn) { btn.disabled = false; btn.innerText = btn.dataset.oldText || btn.innerText; } } catch (e) {}
+  };
+  xhr.onerror = function(){ try { if (btn) { btn.disabled = false; btn.innerText = btn.dataset.oldText || btn.innerText; } } catch(e){} };
+  xhr.send();
+}
+
+function pollProgress(target, elId) {
+  function tick(){
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/plugins/easy-mihomo/api.php?cmd=get_progress&target=' + encodeURIComponent(target));
+    xhr.onload = function(){
+      if (xhr.status === 200) {
+        var box = document.getElementById(elId);
+        var txt = xhr.responseText || '';
+        if (txt.trim()) {
+          box.innerText = txt;
+        } else {
+          // 进度文件已被清理，视为完成
+          if (box.innerText && box.innerText.trim() !== '') {
+            box.innerText = '✅ 下载完成';
+            setTimeout(function(){ box.innerText=''; }, 3000);
+          }
+        }
+      }
+    };
+    xhr.send();
+  }
+  tick();
+  return setInterval(tick, 2000);
+}
+
+function openConfigEditor() {
+  document.getElementById('configModal').style.display = 'block';
+  // 禁用页面滚动
+  document.body.style.overflow = 'hidden';
+}
+
+function closeConfigEditor() {
+  document.getElementById('configModal').style.display = 'none';
+  // 恢复页面滚动
+  document.body.style.overflow = 'auto';
+}
+
+// 点击背景关闭弹出窗口
+document.addEventListener('click', function(event) {
+  var modal = document.getElementById('configModal');
+  if (event.target === modal) {
+    closeConfigEditor();
+  }
+});
+
+// ESC键关闭弹出窗口
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'Escape') {
+    closeConfigEditor();
+  }
+});
+
 // 使用浏览器原生表单提交，确保 emhttp 正常接收带 Content-Length 的上传
 </script>
 </head>
 <body>
 <h2>Mihomo 管理</h2>
 <?php if ($installStatus) { echo $installStatus; } ?>
-<?php if ($msg) { echo '<div class="card"><b>结果：</b> '. $msg .'</div>'; } ?>
 <div class="card">
-  <div><b>状态：</b> <?php
-    $statusText = trim($status ?? 'unknown');
-    if (strpos($statusText, 'running') !== false) {
-      $pid = '';
-      if (preg_match('/pid=(\d+)/', $statusText, $matches)) {
-        $pid = ' (进程ID: ' . $matches[1] . ')';
+  <div>
+    <b>运行状态：</b>
+    <?php
+      $statusText = trim($status ?? 'unknown');
+      if (strpos($statusText, 'running') !== false) {
+        $pid = '';
+        if (preg_match('/pid=(\d+)/', $statusText, $matches)) { $pid = ' (进程ID: ' . $matches[1] . ')'; }
+        echo '<span style="color:#28a745;font-weight:bold;">🟢 运行中' . $pid . '</span>';
+      } elseif (strpos($statusText, 'stopped') !== false) {
+        echo '<span style="color:#dc3545;font-weight:bold;">🔴 已停止</span>';
+      } else {
+        echo '<span style="color:#6c757d;">⚪ ' . htmlspecialchars($statusText) . '</span>';
       }
-      echo '<span style="color: #28a745; font-weight: bold;">🟢 运行中' . $pid . '</span>';
-    } elseif (strpos($statusText, 'stopped') !== false) {
-      echo '<span style="color: #dc3545; font-weight: bold;">🔴 已停止</span>';
-    } else {
-      echo '<span style="color: #6c757d;">⚪ ' . htmlspecialchars($statusText) . '</span>';
-    }
-  ?></div>
-  <div><b>核心：</b> <?= htmlspecialchars(trim($version ?? 'unknown')) ?></div>
-  <div><b>配置：</b> <?= $selectedPath ? htmlspecialchars($selectedPath) : '未选择（请在下方选择）' ?> | <b>二进制：</b> <?= file_exists($binUsb)? htmlspecialchars($binUsb):'缺失' ?></div>
-  <div><b>日志状态：</b> 文件大小: <?= $logSizeFormatted ?> | 总行数: <?= $logLines ?> 行 | 自动清理: 每天凌晨2点</div>
+    ?>
+  </div>
+
+  <div style="margin-top:8px">
+    <b>核心：</b>
+    <?php if ($binExists): ?>
+      <span style="color:#28a745">已安装</span> | <button onclick="startDownload('core', this)">下载/更新核心</button> | 版本：<?= htmlspecialchars(trim($version ?? 'unknown')) ?>
+    <?php elseif ($binUdiskExists): ?>
+      <span style="color:#ffc107">已保存</span>（重启后自动恢复） | <button onclick="startDownload('core', this)">下载/更新核心</button>
+    <?php else: ?>
+      <span style="color:#dc3545">未安装</span> | <button onclick="startDownload('core', this)">下载/更新核心</button>
+    <?php endif; ?>
+    <div id="progress-core" style="font-size:12px;color:#6c757d;margin-top:4px"></div>
+  </div>
+
+  <div style="margin-top:6px">
+    <b>UI：</b>
+    <?php if ($uiExists): ?>
+      <span style="color:#28a745">已安装</span>
+    <?php else: ?>
+      <span style="color:#dc3545">未安装</span>
+    <?php endif; ?>
+    | <button onclick="startDownload('ui', this)">下载/更新UI</button>
+    | <button onclick="openConsole()">打开控制台</button>
+    <div id="progress-ui" style="font-size:12px;color:#6c757d;margin-top:4px"></div>
+  </div>
+
+  <div style="margin-top:6px">
+    <b>配置：</b>
+     <form id="configForm" method="POST" style="display:inline-block;margin:0 8px;vertical-align:middle">
+       <input type="hidden" name="cmd" value="select_conf" />
+       <select name="name" onchange="this.form.submit()" style="min-width:260px">
+         <?php if (!$selectedName): ?>
+           <option value="" disabled selected>请选择配置文件</option>
+         <?php endif; ?>
+         <?php foreach ($available as $f): ?>
+           <option value="<?= htmlspecialchars($f) ?>" <?= ($f === $selectedName ? 'selected' : '') ?>><?= htmlspecialchars($f) ?></option>
+         <?php endforeach; ?>
+       </select>
+     </form>
+     <button onclick="document.getElementById('configForm').submit()">刷新配置列表</button>
+     | <button onclick="openFileManager()">打开配置文件夹</button>
+     | <span style="color:#6c757d">当前：<?= $selectedPath ? htmlspecialchars($selectedPath) : '未选择' ?></span>
+  </div>
+
+  <div style="margin-top:8px">
+    <b>日志：</b> 文件大小: <?= $logSizeFormatted ?> | 总行数: <?= $logLines ?> 行 | 自动清理: 每天凌晨2点
+  </div>
+
   <div style="margin-top:10px">
     <button onclick="executeAction('start')">启动</button>
     <button onclick="executeAction('stop')">停止</button>
     <button onclick="executeAction('restart')">重启服务</button>
     <button onclick="executeAction('clearlog')">清空日志</button>
     <button onclick="executeAction('cleanup_log')" style="background:#ffc107;color:#000;">智能清理</button>
-    <button onclick="openConsole()">打开控制台</button>
+  </div>
+
+  <div style="margin-top:8px">
+    <b>开机启动：</b>
+    <form method="POST" style="display:inline-block;margin:0 8px;vertical-align:middle">
+      <input type="hidden" name="cmd" value="set_bootstart" />
+      <label>
+        <input type="checkbox" name="enable" value="1" <?= $bootstartOn ? 'checked' : '' ?> onchange="this.form.submit()" />
+        开机自动启动 Mihomo
+      </label>
+    </form>
+    <span style="color:#6c757d">
+      <?= $bootstartOn ? '✅ 已启用' : '❌ 未启用' ?>
+    </span>
   </div>
 </div>
+<!-- 在线编辑配置按钮 -->
 <div class="card">
-  <div><b>开机即启动（不依赖阵列）</b></div>
-  <form method="POST" style="margin-top:8px">
-    <input type="hidden" name="cmd" value="set_bootstart" />
-    <label>
-      <input type="checkbox" name="enable" value="1" <?php if ($bootstartOn) echo 'checked'; ?> />
-      启用后将在系统启动阶段启动（通过 go 注入）
-    </label>
-    <div style="margin-top:8px"><button type="submit">保存</button></div>
-  </form>
-  <small>等待启动脚本就绪（最多 60 秒），可随时在此移除。</small>
-</div>
-<div class="card">
-  <div><b>选择配置文件启动</b></div>
-  <form method="POST" style="margin-top:8px">
-    <input type="hidden" name="cmd" value="select_conf" />
-    <select name="name" style="min-width:260px">
-      <?php if (!$selectedName): ?>
-        <option value="" disabled selected>请选择配置文件</option>
-      <?php endif; ?>
-      <?php foreach ($available as $f): ?>
-        <option value="<?= htmlspecialchars($f) ?>" <?= ($f === $selectedName ? 'selected' : '') ?>><?= htmlspecialchars($f) ?></option>
-      <?php endforeach; ?>
-    </select>
-    <button type="submit">保存选择</button>
-  </form>
-  <small>未选择配置时无法启动；仅列出该目录下的 .yml/.yaml 文件。</small>
-</div>
-<div class="card">
-  <div><b>配置文件管理</b></div>
-  <div style="background:#f8f9fa;padding:12px;border-radius:6px;margin:8px 0;">
-    <strong>📁 配置文件目录：</strong><br>
-    <code>/boot/config/plugins/easy-mihomo/</code><br><br>
-    <strong>📝 添加配置文件：</strong><br>
-    1. 点击下方按钮打开 Unraid 文件管理器<br>
-    2. 或通过 SMB、FTP、SSH 等方式访问 Unraid 的 /boot 分区<br>
-    3. 上传后刷新页面即可在上方选择配置<br><br>
-    <div style="margin-top:12px;">
-      <button onclick="openFileManager()" style="background:#007bff;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">
-        📂 打开文件管理器上传配置
-      </button>
-    </div>
-    <br>
-    <strong>💡 提示：</strong> 支持多个配置文件，系统会自动识别 .yaml/.yml 格式
+  <div><b>配置编辑：</b>
+    <button onclick="openConfigEditor()" <?= $selectedPath? '':'disabled' ?> style="margin-left:8px">
+      <?= $selectedPath? '编辑配置 (' . htmlspecialchars($selectedName) . ')':'请先选择配置文件' ?>
+    </button>
   </div>
 </div>
-<div class="card">
-  <div><b>在线编辑所选配置</b> <?= $selectedName? '(' . htmlspecialchars($selectedName) . ')':'' ?></div>
-  <form method="POST">
-    <input type="hidden" name="cmd" value="saveconf" />
-    <div>
-      <textarea name="content" style="width:100%;height:260px;font-family:monospace" spellcheck="false" <?= $selectedPath? '':'disabled' ?>><?php echo htmlspecialchars($confText); ?></textarea>
+
+<!-- 配置编辑弹出窗口 -->
+<div id="configModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;overflow:auto;box-sizing:border-box;">
+  <div style="position:relative;margin:8% auto 5% auto;background:white;border-radius:8px;padding:20px;width:90%;max-width:1200px;min-height:600px;box-shadow:0 4px 20px rgba(0,0,0,0.3);box-sizing:border-box;">
+    <div style="margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">
+      <h3 style="margin:0;">编辑配置: <?= htmlspecialchars($selectedName) ?></h3>
     </div>
-    <div style="margin-top:8px">
-      <label><input type="checkbox" name="restart" value="1" <?= $selectedPath? '':'disabled' ?> /> 保存后重启服务</label>
-    </div>
-    <div style="margin-top:8px">
-      <button type="submit" <?= $selectedPath? '':'disabled' ?>>保存配置</button>
-    </div>
-  </form>
-  <small><?= $selectedPath? '保存将直接覆盖所选配置（上限 1MB）。':'尚未选择配置文件，请先在“选择配置文件启动”中选择。' ?></small>
+    <form method="POST" style="display:flex;flex-direction:column;">
+      <input type="hidden" name="cmd" value="saveconf" />
+      <div style="margin-bottom:15px;">
+        <textarea name="content" style="width:100%;height:500px;font-family:monospace;font-size:14px;border:1px solid #ddd;border-radius:4px;padding:10px;resize:vertical;box-sizing:border-box;" spellcheck="false" <?= $selectedPath? '':'disabled' ?>><?php echo htmlspecialchars($confText); ?></textarea>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eee;padding-top:15px;">
+        <label><input type="checkbox" name="restart" value="1" <?= $selectedPath? '':'disabled' ?> /> 保存后重启服务</label>
+        <div>
+          <button type="button" onclick="closeConfigEditor()" style="margin-right:10px;padding:8px 16px;border:1px solid #ddd;background:white;border-radius:4px;cursor:pointer;">取消</button>
+          <button type="submit" <?= $selectedPath? '':'disabled' ?> style="padding:8px 16px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer;">保存配置</button>
+        </div>
+      </div>
+    </form>
+    <small style="color:#6c757d;margin-top:10px;display:block;"><?= $selectedPath? '保存将直接覆盖所选配置（上限 1MB）。':'尚未选择配置文件。' ?></small>
+  </div>
 </div>
 <div class="card">
   <div><b>日志（最近 200 行）：</b></div>
@@ -517,8 +591,53 @@ function openFileManager() {
     <button onclick="executeAction('start')">刷新（并尝试启动）</button>
   </div>
 </div>
+<div id="download-msg" style="font-size:12px;color:#6c757d;margin-top:6px"></div>
+<script>
+// 页面加载后开始轮询进度
+pollProgress('core', 'progress-core');
+pollProgress('ui', 'progress-ui');
+</script>
 </body>
 </html>
+]]></INLINE>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/api.php">
+<INLINE><![CDATA[
+<?php
+// 轻量 API：纯文本返回，避免 emhttp 外层 HTML 包装
+header('Content-Type: text/plain; charset=utf-8');
+
+$baseRun = '/usr/local/emhttp/plugins/easy-mihomo';
+$scripts = $baseRun . '/scripts';
+$progressDir = '/var/tmp/easy-mihomo-progress';
+@mkdir($progressDir, 0777, true);
+
+$cmd = $_GET['cmd'] ?? $_POST['cmd'] ?? '';
+if ($cmd === 'get_progress') {
+  $target = $_GET['target'] ?? $_POST['target'] ?? '';
+  $file = '';
+  if ($target === 'core') $file = $progressDir . '/core.status';
+  if ($target === 'ui')   $file = $progressDir . '/ui.status';
+  if ($file && is_file($file)) { echo @file_get_contents($file); }
+  exit;
+}
+if ($cmd === 'start_download') {
+  $target = $_GET['target'] ?? $_POST['target'] ?? '';
+  if ($target === 'core') {
+    @unlink($progressDir . '/core.status');
+    $out = shell_exec("nohup bash $scripts/download_core.sh --progress >$progressDir/core.log 2>&1 & echo $!");
+    echo '核心下载任务已启动 PID: ' . trim($out);
+  } elseif ($target === 'ui') {
+    @unlink($progressDir . '/ui.status');
+    $out = shell_exec("nohup bash $scripts/download_ui.sh --progress >$progressDir/ui.log 2>&1 & echo $!");
+    echo 'UI 下载任务已启动 PID: ' . trim($out);
+  } else {
+    echo '未知的下载目标';
+  }
+  exit;
+}
+echo 'unknown command';
 ]]></INLINE>
 </FILE>
 
@@ -543,10 +662,7 @@ fi
 LOG_FILE="/var/log/mihomo.log"
 PID_FILE="/var/run/mihomo.pid"
 
-if [ ! -x "$BIN" ]; then echo "二进制缺失: $BIN" >&2; exit 1; fi
-if [ ! -f "$CONF_FILE" ]; then echo "配置文件缺失: $CONF_FILE" >&2; exit 1; fi
-
-# 已在运行则退出
+# 防重复启动检查（必须在最前面）
 if [ -f "$PID_FILE" ]; then
   PID=$(cat "$PID_FILE" 2>/dev/null || true)
   if [ -n "$PID" ] && ps -p "$PID" >/dev/null 2>&1; then
@@ -554,6 +670,105 @@ if [ -f "$PID_FILE" ]; then
     exit 0
   fi
 fi
+
+# 检查并恢复核心文件（重启后内存文件丢失）
+if [ ! -f "$BIN" ]; then
+  UDISK_BIN="/boot/config/plugins/easy-mihomo/mihomo"
+  if [ -f "$UDISK_BIN" ]; then
+    echo "检测到核心文件缺失，从U盘恢复..." >> "$LOG_FILE" 2>&1
+    mkdir -p /usr/local/bin
+    cp -f "$UDISK_BIN" "$BIN"
+    chmod +x "$BIN"
+    echo "核心文件已从U盘恢复到内存" >> "$LOG_FILE" 2>&1
+  else
+    echo "二进制缺失: $BIN" >> "$LOG_FILE" 2>&1
+    echo "二进制缺失: $BIN"
+    exit 1
+  fi
+fi
+
+# UI 运行于内存，直接修改配置文件路径指向内存目录
+UI_ZIP_PATH="/boot/config/plugins/easy-mihomo/zashboard.zip"
+UI_RAM_DIR="/var/tmp/easy-mihomo-ui/zashboard"
+
+# 每次启动都重新解压UI到内存（确保最新）
+if [ -f "$UI_ZIP_PATH" ]; then
+  echo "解压 UI 到内存（覆盖）..." >> "$LOG_FILE" 2>&1
+  rm -rf "$UI_RAM_DIR" && mkdir -p "$UI_RAM_DIR"
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -oq "$UI_ZIP_PATH" -d "$UI_RAM_DIR" >> "$LOG_FILE" 2>&1 || true
+  elif command -v busybox >/dev/null 2>&1; then
+    busybox unzip -oq "$UI_ZIP_PATH" -d "$UI_RAM_DIR" >> "$LOG_FILE" 2>&1 || true
+  fi
+  # 若有 dist/ 子目录，上移其内容并删除
+  if [ -d "$UI_RAM_DIR/dist" ]; then
+    cp -rf "$UI_RAM_DIR/dist/." "$UI_RAM_DIR/" 2>>"$LOG_FILE" || true
+    rm -rf "$UI_RAM_DIR/dist" 2>>"$LOG_FILE" || true
+  fi
+  echo "UI 解压完成" >> "$LOG_FILE" 2>&1
+else
+  echo "UI zip文件不存在，跳过解压" >> "$LOG_FILE" 2>&1
+fi
+
+# 在mihomo工作目录内创建bind mount指向内存UI目录
+UI_MOUNT_DIR="/boot/config/plugins/easy-mihomo/ui/zashboard"
+echo "创建UI bind mount..." >> "$LOG_FILE" 2>&1
+
+# 确保目标目录存在
+mkdir -p "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || true
+
+# 如果已经挂载，先卸载
+if mountpoint -q "$UI_MOUNT_DIR" 2>/dev/null; then
+  echo "卸载现有bind mount: $UI_MOUNT_DIR" >> "$LOG_FILE" 2>&1
+  umount "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || umount -l "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || true
+fi
+
+# 清理目录内容（如果存在）
+if [ -d "$UI_MOUNT_DIR" ] && [ ! -L "$UI_MOUNT_DIR" ]; then
+  echo "清理目录内容: $UI_MOUNT_DIR" >> "$LOG_FILE" 2>&1
+  rm -rf "$UI_MOUNT_DIR"/* 2>>"$LOG_FILE" || true
+fi
+
+# 创建bind mount
+echo "创建bind mount: $UI_MOUNT_DIR <- $UI_RAM_DIR" >> "$LOG_FILE" 2>&1
+mount --bind "$UI_RAM_DIR" "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || {
+  echo "bind mount创建失败，尝试清理后重试..." >> "$LOG_FILE" 2>&1
+  # 如果失败，清理目录后重试
+  rm -rf "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || true
+  mkdir -p "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || true
+  mount --bind "$UI_RAM_DIR" "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || true
+}
+
+# 验证bind mount是否成功
+if mountpoint -q "$UI_MOUNT_DIR" 2>/dev/null; then
+  echo "bind mount创建成功" >> "$LOG_FILE" 2>&1
+else
+  echo "bind mount创建失败，使用软链接作为备选方案..." >> "$LOG_FILE" 2>&1
+  rm -rf "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || true
+  ln -s "$UI_RAM_DIR" "$UI_MOUNT_DIR" 2>>"$LOG_FILE" || true
+fi
+
+# 检查并修复配置文件中的UI路径
+if [ -f "$CONF_FILE" ]; then
+  echo "检查配置文件UI路径..." >> "$LOG_FILE" 2>&1
+  CURRENT_UI_PATH=$(grep "^external-ui:" "$CONF_FILE" | head -1 | sed 's/.*external-ui: *//' | tr -d ' ' || echo "")
+  
+  if [[ "$CURRENT_UI_PATH" != "ui" ]]; then
+    echo "检测到UI路径为: $CURRENT_UI_PATH，修改为: ui" >> "$LOG_FILE" 2>&1
+    # 备份原配置
+    cp "$CONF_FILE" "$CONF_FILE.bak.$(date +%s)" 2>/dev/null || true
+    # 修改UI路径为ui
+    sed -i "s|^external-ui:.*|external-ui: ui|g" "$CONF_FILE"
+    echo "UI路径已修改为: ui" >> "$LOG_FILE" 2>&1
+  else
+    echo "UI路径正确: ui" >> "$LOG_FILE" 2>&1
+  fi
+else
+  echo "配置文件不存在，跳过UI路径检查" >> "$LOG_FILE" 2>&1
+fi
+
+if [ ! -x "$BIN" ]; then echo "二进制缺失: $BIN" >&2; exit 1; fi
+if [ ! -f "$CONF_FILE" ]; then echo "配置文件缺失: $CONF_FILE" >&2; exit 1; fi
 
 # 尝试加载 TUN（忽略失败）
 modprobe tun 2>/dev/null || true
@@ -604,6 +819,19 @@ if pgrep -x mihomo >/dev/null 2>&1; then
   fi
 fi
 
+# 清理UI bind mount或软链接
+UI_MOUNT_DIR="/boot/config/plugins/easy-mihomo/ui/zashboard"
+if mountpoint -q "$UI_MOUNT_DIR" 2>/dev/null; then
+  echo "卸载bind mount: $UI_MOUNT_DIR" >&2
+  umount "$UI_MOUNT_DIR" 2>/dev/null || umount -l "$UI_MOUNT_DIR" 2>/dev/null || true
+elif [ -L "$UI_MOUNT_DIR" ]; then
+  echo "清理软链接: $UI_MOUNT_DIR" >&2
+  rm -f "$UI_MOUNT_DIR" 2>/dev/null || true
+elif [ -d "$UI_MOUNT_DIR" ]; then
+  echo "清理目录: $UI_MOUNT_DIR" >&2
+  rm -rf "$UI_MOUNT_DIR" 2>/dev/null || true
+fi
+
 # 清理 pidfile（若进程已不存在）
 if [ -f "$PID_FILE" ]; then
   if ! ps -p $(cat "$PID_FILE" 2>/dev/null || echo 0) >/dev/null 2>&1; then
@@ -652,6 +880,118 @@ fi
 ]]></INLINE>
 </FILE>
 
+<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/download_core.sh" Mode="0755">
+<INLINE><![CDATA[
+#!/bin/bash
+set -e
+
+PROGRESS=0
+if [ "$1" = "--progress" ]; then PROGRESS=1; fi
+
+DOWNLOAD_DIR="/tmp/mihomo-download"
+GITHUB_BASE="https://raw.githubusercontent.com/wlaosj/easy-mihomo/main"
+CORE_GZ="mihomo.gz"
+TMP_BIN="/tmp/mihomo-latest"
+STATUS_DIR="/var/tmp/easy-mihomo-progress"
+STATUS_FILE="$STATUS_DIR/core.status"
+mkdir -p "$STATUS_DIR"
+
+write_status(){
+  echo "$1"
+  if [ "$PROGRESS" = "1" ]; then echo "$1" > "$STATUS_FILE"; fi
+}
+
+trap 'write_status "error: unexpected failure"' ERR
+
+mkdir -p "$DOWNLOAD_DIR"
+write_status "10%: 准备下载核心..."
+if wget -q "$GITHUB_BASE/$CORE_GZ" -O "$DOWNLOAD_DIR/$CORE_GZ"; then
+  write_status "60%: 下载完成，正在解压..."
+else
+  write_status "error: 下载失败"; exit 1
+fi
+
+if gunzip -c "$DOWNLOAD_DIR/$CORE_GZ" > "$TMP_BIN" 2>/dev/null; then
+  chmod +x "$TMP_BIN"
+else
+  write_status "error: 解压失败"; rm -f "$TMP_BIN"; exit 1
+fi
+
+write_status "90%: 正在安装核心..."
+mkdir -p /usr/local/bin
+mkdir -p /boot/config/plugins/easy-mihomo
+
+# 双重存储：U盘持久化 + 内存系统PATH
+cp -f "$TMP_BIN" /boot/config/plugins/easy-mihomo/mihomo
+cp -f "$TMP_BIN" /usr/local/bin/mihomo
+chmod +x /boot/config/plugins/easy-mihomo/mihomo
+chmod +x /usr/local/bin/mihomo
+
+rm -f "$TMP_BIN"
+rm -rf "$DOWNLOAD_DIR"
+write_status "100%: 核心安装完成（已保存到U盘和内存）"
+( sleep 1; rm -f "$STATUS_FILE" ) >/dev/null 2>&1 &
+]]></INLINE>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/scripts/download_ui.sh" Mode="0755">
+<INLINE><![CDATA[
+#!/bin/bash
+set -e
+
+PROGRESS=0
+if [ "$1" = "--progress" ]; then PROGRESS=1; fi
+
+UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip"
+UI_ROOT="/boot/config/plugins/easy-mihomo"
+ZIP_PATH="$UI_ROOT/zashboard.zip"
+RAM_ROOT="/var/tmp/easy-mihomo-ui"
+RAM_DIR="$RAM_ROOT/zashboard"
+STATUS_DIR="/var/tmp/easy-mihomo-progress"
+STATUS_FILE="$STATUS_DIR/ui.status"
+TMP_DIR="/tmp/easy-mihomo-ui"
+ZIP_FILE="$TMP_DIR/dist.zip"
+
+mkdir -p "$STATUS_DIR" "$TMP_DIR" "$UI_ROOT" "$RAM_DIR"
+
+write_status(){
+  echo "$1"
+  if [ "$PROGRESS" = "1" ]; then echo "$1" > "$STATUS_FILE"; fi
+}
+
+trap 'write_status "error: unexpected failure"' ERR
+
+write_status "10%: 正在下载 UI 包..."
+if ! wget -qO "$ZIP_FILE" --tries=3 --waitretry=1 --connect-timeout=5 --read-timeout=30 "$UI_URL"; then
+  write_status "error: 下载失败"; rm -rf "$TMP_DIR"; exit 1
+fi
+
+write_status "60%: 正在保存到U盘..."
+# 单次顺序写入到 U 盘，减少随机写
+mv -f "$ZIP_FILE" "$ZIP_PATH"
+
+write_status "90%: 正在解压到内存..."
+# 在内存目录中解压（覆盖现有）
+rm -rf "$RAM_DIR" && mkdir -p "$RAM_DIR"
+if command -v unzip >/dev/null 2>&1; then
+  unzip -oq "$ZIP_PATH" -d "$RAM_DIR"
+elif command -v busybox >/dev/null 2>&1; then
+  busybox unzip -oq "$ZIP_PATH" -d "$RAM_DIR"
+else
+  write_status "error: 系统缺少 unzip/busybox"; rm -rf "$TMP_DIR"; exit 1
+fi
+# 规范化：如果解压后存在 dist/ 子目录，移动其内容到根并删除 dist/
+if [ -d "$RAM_DIR/dist" ]; then
+  cp -rf "$RAM_DIR/dist/." "$RAM_DIR/"
+  rm -rf "$RAM_DIR/dist"
+fi
+
+rm -rf "$TMP_DIR"
+write_status "100%: UI 已保存到U盘并解压到内存"
+( sleep 1; rm -f "$STATUS_FILE" ) >/dev/null 2>&1 &
+]]></INLINE>
+</FILE>
+
 <!-- Main page content -->
 <FILE Name="/usr/local/emhttp/plugins/easy-mihomo/EasyMihomo.Main.page">
 <INLINE><![CDATA[
@@ -671,8 +1011,6 @@ include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
 <FILE Run="/bin/bash">
 <INLINE>
 set -e
-mkdir -p /usr/local/emhttp/plugins/easy-mihomo/scripts;
-
 echo "Mihomo plugin installed. Persistent path: /boot/config/plugins/easy-mihomo"
 </INLINE>
 </FILE>
@@ -687,18 +1025,42 @@ echo "Cleanup completed"
 
 <!-- remove -->
 <FILE Run="/bin/bash" Method="remove">
-<INLINE>
+<INLINE><![CDATA[
 set -e
 echo "正在卸载 Easy-Mihomo 插件..."
 
 # 停止mihomo进程
 echo "  - 正在停止 Mihomo 服务..."
-if pgrep -x mihomo >/dev/null 2>&amp;1; then
+if pgrep -x mihomo >/dev/null 2>&1; then
+  echo "    检测到mihomo进程，正在停止..."
   pkill -9 -x mihomo 2>/dev/null || true
+  # 等待进程完全停止
+  sleep 2
+  if pgrep -x mihomo >/dev/null 2>&1; then
+    echo "    强制停止mihomo进程..."
+    pkill -9 -x mihomo 2>/dev/null || true
+    sleep 1
+  fi
   echo "  ✓ Mihomo 服务已停止"
 else
   echo "  ✓ Mihomo 服务未运行"
 fi
+
+# 卸载 UI bind 挂载（若存在）
+echo "  - 卸载 UI 挂载..."
+UI_MOUNT_DIR="/boot/config/plugins/easy-mihomo/ui/zashboard"
+if [ -d "$UI_MOUNT_DIR" ] && mountpoint -q "$UI_MOUNT_DIR"; then
+  echo "    检测到bind mount，正在卸载..."
+  umount "$UI_MOUNT_DIR" 2>/dev/null || umount -l "$UI_MOUNT_DIR" 2>/dev/null || true
+  echo "    bind mount已卸载"
+elif [ -L "$UI_MOUNT_DIR" ]; then
+  echo "    检测到软链接，正在删除..."
+  rm -f "$UI_MOUNT_DIR" 2>/dev/null || true
+  echo "    软链接已删除"
+else
+  echo "    无需处理UI挂载"
+fi
+echo "  ✓ UI 挂载处理完成"
 
 # 清理PID文件
 echo "  - 清理进程文件..."
@@ -708,6 +1070,7 @@ echo "  ✓ 进程文件已清理"
 # 清理二进制文件
 echo "  - 清理二进制文件..."
 rm -f /usr/local/bin/mihomo
+rm -f /boot/config/plugins/easy-mihomo/mihomo
 echo "  ✓ 二进制文件已清理"
 
 # 清理插件目录
@@ -715,6 +1078,11 @@ echo "  - 清理插件目录..."
 rm -rf /usr/local/emhttp/plugins/easy-mihomo
 rm -rf /boot/config/plugins/easy-mihomo
 echo "  ✓ 插件目录已清理"
+
+# 清理内存临时目录
+echo "  - 清理内存临时目录..."
+rm -rf /var/tmp/easy-mihomo-ui /var/tmp/easy-mihomo-progress /tmp/easy-mihomo-ui /tmp/mihomo-download
+echo "  ✓ 内存临时目录已清理"
 
 # 清理系统覆盖层文件（仅限本插件命名空间）
 echo "  - 清理系统文件..."
@@ -746,7 +1114,7 @@ echo "  ✓ 定时清理任务已清理"
 echo ""
 echo "🎉 Easy-Mihomo 插件卸载完成！"
 echo "   所有相关文件和配置已完全清理。"
-</INLINE>
+]]></INLINE>
 </FILE>
 
 </PLUGIN>
