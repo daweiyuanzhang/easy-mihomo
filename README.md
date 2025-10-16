@@ -1,6 +1,8 @@
 # Easy-Mihomo for Unraid
 
 一个为 Unraid 系统设计的 Mihomo 代理客户端插件，提供简单易用的 Web 管理界面。
+作者：隔壁小王
+UNRAID群友专供
 
 ## 技术支持
 
