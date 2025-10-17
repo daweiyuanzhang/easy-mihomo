@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.1">
+<!ENTITY version   "1.0.2">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,6 +14,13 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.2  功能与体验更新
+- 修复：配置编辑器保存不生效（提前初始化已选配置并在保存时防御性回读）
+- 优化：启动时统一标准化关键配置项（external-ui-url/name、external-ui、external-controller、secret），自动覆写或追加以提升兼容性
+- 清理：移除重复 external-ui 覆写，合并为一次备份+统一 upsert
+- 体验：在“打开控制台”后新增主机/端口/密码行内提示（主机自动取当前内网IP，端口9090，密码yyds666）
+- 新增：仪表板显示模块（自动5秒刷新状态/版本/配置/内存/运行时间，含快捷操作）
+
 1.0.1  日志管理增强版
 - 新增自动日志清理功能
 - 支持定期清理（每天凌晨2点）
@@ -101,6 +108,244 @@ EOF
 chmod +x "/usr/local/emhttp/plugins/easy-mihomo/scripts/log_cleanup.sh"
 echo "  ✓ 日志清理脚本已创建"
 
+# 创建仪表板JavaScript文件
+echo "  - 正在创建仪表板JavaScript文件..."
+cat > "/usr/local/emhttp/plugins/easy-mihomo/scripts/mihomo-dashboard.js" << 'EOF'
+/*
+  MIT License
+
+  Copyright (c) 2024 Easy-Mihomo
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+*/
+
+/**
+ * Mihomo Dashboard JavaScript Functions
+ * 提供仪表板实时数据更新功能
+ */
+
+// 全局变量
+let mihomoDashboardInterval = null;
+let mihomoLastUpdate = 0;
+
+/**
+ * 刷新mihomo仪表板数据
+ */
+function refreshMihomoDashboard() {
+    const now = Date.now();
+    
+    // 防止过于频繁的请求（最小间隔1秒）
+    if (now - mihomoLastUpdate < 1000) {
+        return;
+    }
+    
+    mihomoLastUpdate = now;
+    
+    $.getJSON('/plugins/easy-mihomo/api.php?cmd=dashboard_status')
+        .done(function(data) {
+            updateMihomoDashboard(data);
+        })
+        .fail(function(xhr, status, error) {
+            console.error('Failed to fetch mihomo dashboard data:', error);
+            showMihomoError();
+        });
+}
+
+/**
+ * 更新仪表板显示
+ * @param {Object} data - 从API获取的数据
+ */
+function updateMihomoDashboard(data) {
+    if (!data) {
+        showMihomoError();
+        return;
+    }
+    
+    // 更新状态显示
+    updateMihomoStatus(data);
+    
+    // 更新版本信息
+    updateMihomoVersion(data);
+    
+    // 更新服务状态
+    updateMihomoService(data);
+    
+    // 更新配置信息
+    updateMihomoConfig(data);
+    
+    // 更新内存使用信息
+    updateMihomoMemory(data);
+    
+    // 更新运行时间信息
+    updateMihomoUptime(data);
+}
+
+/**
+ * 更新mihomo运行状态
+ * @param {Object} data - 数据对象
+ */
+function updateMihomoStatus(data) {
+    const statusIcon = $('.mihomo-status-icon');
+    const statusText = $('.mihomo-status-text');
+    
+    // 移除所有状态类
+    statusIcon.removeClass('running stopped loading');
+    
+    if (data.running) {
+        statusIcon.addClass('running');
+        statusText.text(_('运行中'));
+    } else {
+        statusIcon.addClass('stopped');
+        statusText.text(_('已停止'));
+    }
+}
+
+/**
+ * 更新版本信息
+ * @param {Object} data - 数据对象
+ */
+function updateMihomoVersion(data) {
+    const versionText = $('#mihomo-version');
+    const version = data.version || _('未知');
+    versionText.text(_('版本: ') + version);
+}
+
+/**
+ * 更新服务状态
+ * @param {Object} data - 数据对象
+ */
+function updateMihomoService(data) {
+    const serviceStatus = $('.mihomo-service-status');
+    
+    if (data.running) {
+        serviceStatus.html('<span style="color:#28a745;font-weight:bold;">' + _('运行中') + '</span>');
+    } else {
+        serviceStatus.html('<span style="color:#dc3545;font-weight:bold;">' + _('已停止') + '</span>');
+    }
+}
+
+/**
+ * 更新配置信息
+ * @param {Object} data - 数据对象
+ */
+function updateMihomoConfig(data) {
+    const configInfo = $('.mihomo-config-info');
+    
+    if (data.config && data.config.has_config) {
+        const configName = data.config.selected_config || _('未知');
+        configInfo.html('<span style="color:#28a745;">' + configName + '</span>');
+    } else {
+        configInfo.html('<span style="color:#dc3545;">' + _('未选择配置') + '</span>');
+    }
+}
+
+/**
+ * 更新内存使用信息
+ * @param {Object} data - 数据对象
+ */
+function updateMihomoMemory(data) {
+    const memoryInfo = $('.mihomo-memory-info');
+    
+    if (data.running && data.memory) {
+        memoryInfo.html('<span style="color:#17a2b8;">' + data.memory + '</span>');
+    } else {
+        memoryInfo.html('<span style="color:#6c757d;">' + _('未知') + '</span>');
+    }
+}
+
+/**
+ * 更新运行时间信息
+ * @param {Object} data - 数据对象
+ */
+function updateMihomoUptime(data) {
+    const uptimeInfo = $('.mihomo-uptime-info');
+    
+    if (data.running && data.uptime) {
+        uptimeInfo.html('<span style="color:#28a745;">' + data.uptime + '</span>');
+    } else {
+        uptimeInfo.html('<span style="color:#6c757d;">' + _('未知') + '</span>');
+    }
+}
+
+/**
+ * 显示错误状态
+ */
+function showMihomoError() {
+    $('.mihomo-status-icon').removeClass('running stopped').addClass('loading');
+    $('.mihomo-status-text').text(_('状态: 错误'));
+    $('.mihomo-service-status').text(_('错误'));
+    $('.mihomo-config-info').text(_('错误'));
+    $('.mihomo-memory-info').text(_('错误'));
+    $('.mihomo-uptime-info').text(_('错误'));
+}
+
+/**
+ * 启动自动刷新
+ * @param {number} interval - 刷新间隔（毫秒）
+ */
+function startMihomoDashboardRefresh(interval = 5000) {
+    // 清除现有定时器
+    if (mihomoDashboardInterval) {
+        clearInterval(mihomoDashboardInterval);
+    }
+    
+    // 立即执行一次
+    refreshMihomoDashboard();
+    
+    // 设置定时刷新
+    mihomoDashboardInterval = setInterval(refreshMihomoDashboard, interval);
+}
+
+/**
+ * 停止自动刷新
+ */
+function stopMihomoDashboardRefresh() {
+    if (mihomoDashboardInterval) {
+        clearInterval(mihomoDashboardInterval);
+        mihomoDashboardInterval = null;
+    }
+}
+
+/**
+ * 手动刷新仪表板
+ */
+function manualRefreshMihomoDashboard() {
+    refreshMihomoDashboard();
+}
+
+// 页面加载完成后自动启动
+$(document).ready(function() {
+    // 检查是否在仪表板页面
+    if ($('#tblMihomoDash').length > 0) {
+        startMihomoDashboardRefresh(5000);
+    }
+});
+
+// 页面卸载时清理定时器
+$(window).on('beforeunload', function() {
+    stopMihomoDashboardRefresh();
+});
+EOF
+
+chmod +x "/usr/local/emhttp/plugins/easy-mihomo/scripts/mihomo-dashboard.js"
+echo "  ✓ 仪表板JavaScript文件已创建"
+
 # 添加定时任务（每天凌晨2点清理）
 echo "  - 正在设置定时清理任务..."
 # 移除旧的定时任务
@@ -123,6 +368,10 @@ $scripts = $baseRun . '/scripts';
 $logFile = '/var/log/mihomo.log';
 $confDir = '/boot/config/plugins/easy-mihomo';
 $selectFile = $confDir . '/selected.conf';
+
+// 提前读取当前选择的配置，供后续命令处理（如 saveconf）使用
+$selectedName = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
+$selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($confDir . '/' . $selectedName) : '';
 
 // 进度文件目录
 $progressDir = '/var/tmp/easy-mihomo-progress';
@@ -211,6 +460,11 @@ if ($cmd === 'saveconf') {
   } else if (strlen($content) > $maxSize) {
     $msg = '内容过大（>1MB）';
   } else {
+    // 防御性：若上方未读取到，命令阶段再次解析一次
+    if (!$selectedPath) {
+      $selectedNameCmd = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
+      $selectedPath = ($selectedNameCmd && is_file($confDir . '/' . $selectedNameCmd)) ? ($confDir . '/' . $selectedNameCmd) : '';
+    }
     if (!$selectedPath) {
       $msg = '未选择配置，请先在页面中选择';
     } else {
@@ -506,6 +760,11 @@ document.addEventListener('keydown', function(event) {
     <?php endif; ?>
     | <button onclick="startDownload('ui', this)">下载/更新UI</button>
     | <button onclick="openConsole()">打开控制台</button>
+    <span style="margin-left:8px;color:#6c757d;white-space:nowrap;">
+      主机：<span id="zash-host">-</span>
+      | 端口：<span>9090</span>
+      | 密码：<span>yyds666</span>
+    </span>
     <div id="progress-ui" style="font-size:12px;color:#6c757d;margin-top:4px"></div>
   </div>
 
@@ -529,6 +788,9 @@ document.addEventListener('keydown', function(event) {
 
   <div style="margin-top:8px">
     <b>日志：</b> 文件大小: <?= $logSizeFormatted ?> | 总行数: <?= $logLines ?> 行 | 自动清理: 每天凌晨2点
+    <button onclick="openLogViewer()" style="margin-left:8px;background:#17a2b8;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;">
+      <i class="fa fa-eye"></i> 查看日志
+    </button>
   </div>
 
   <div style="margin-top:10px">
@@ -584,18 +846,127 @@ document.addEventListener('keydown', function(event) {
     <small style="color:#6c757d;margin-top:10px;display:block;"><?= $selectedPath? '保存将直接覆盖所选配置（上限 1MB）。':'尚未选择配置文件。' ?></small>
   </div>
 </div>
-<div class="card">
-  <div><b>日志（最近 200 行）：</b></div>
-  <pre><?= htmlspecialchars($logTail) ?></pre>
-  <div>
-    <button onclick="executeAction('start')">刷新（并尝试启动）</button>
+
+<!-- 日志查看器弹出窗口 -->
+<div id="logModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;overflow:auto;box-sizing:border-box;">
+  <div style="position:relative;margin:5% auto 5% auto;background:white;border-radius:8px;padding:20px;width:90%;max-width:1200px;min-height:600px;box-shadow:0 4px 20px rgba(0,0,0,0.3);box-sizing:border-box;">
+    <div style="margin-bottom:15px;border-bottom:1px solid #eee;padding-bottom:10px;">
+      <h3 style="margin:0;">Mihomo 日志查看器</h3>
+      <div style="margin-top:8px;color:#6c757d;font-size:14px;">
+        文件大小: <?= $logSizeFormatted ?> | 总行数: <?= $logLines ?> 行 | 显示最近 200 行
+      </div>
+    </div>
+    <div style="margin-bottom:15px;">
+      <div style="display:flex;gap:10px;margin-bottom:10px;">
+        <button onclick="refreshLogViewer()" style="padding:6px 12px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer;">
+          <i class="fa fa-refresh"></i> 刷新日志
+        </button>
+        <button onclick="executeLogAction('clearlog')" style="padding:6px 12px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;">
+          <i class="fa fa-trash"></i> 清空日志
+        </button>
+        <button onclick="executeLogAction('cleanup_log')" style="padding:6px 12px;background:#ffc107;color:#000;border:none;border-radius:4px;cursor:pointer;">
+          <i class="fa fa-magic"></i> 智能清理
+        </button>
+      </div>
+      <div style="border:1px solid #ddd;border-radius:4px;background:#f8f9fa;max-height:500px;overflow:auto;">
+        <pre id="logContent" style="margin:0;padding:15px;font-family:monospace;font-size:12px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;"><?= htmlspecialchars($logTail) ?></pre>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eee;padding-top:15px;">
+      <div style="color:#6c757d;font-size:12px;">
+        自动清理: 每天凌晨2点 | 最大保留: 1000行
+      </div>
+      <button onclick="closeLogViewer()" style="padding:8px 16px;border:1px solid #ddd;background:white;border-radius:4px;cursor:pointer;">关闭</button>
+    </div>
   </div>
 </div>
+
 <div id="download-msg" style="font-size:12px;color:#6c757d;margin-top:6px"></div>
 <script>
 // 页面加载后开始轮询进度
 pollProgress('core', 'progress-core');
 pollProgress('ui', 'progress-ui');
+
+// 填充 Zashboard 访问信息（主机/端口/密码）
+document.addEventListener('DOMContentLoaded', function() {
+  var elHost = document.getElementById('zash-host');
+  if (elHost) {
+    elHost.textContent = window.location.hostname || '-';
+  }
+});
+
+// 日志查看器功能
+function openLogViewer() {
+  document.getElementById('logModal').style.display = 'block';
+  // 自动滚动到底部显示最新日志
+  setTimeout(function() {
+    var logContent = document.getElementById('logContent');
+    logContent.scrollTop = logContent.scrollHeight;
+  }, 100);
+}
+
+function closeLogViewer() {
+  document.getElementById('logModal').style.display = 'none';
+}
+
+function refreshLogViewer() {
+  // 显示加载状态
+  var logContent = document.getElementById('logContent');
+  var originalContent = logContent.innerHTML;
+  logContent.innerHTML = '<span style="color:#6c757d;">正在刷新日志...</span>';
+  
+  // 刷新页面以获取最新日志
+  setTimeout(function() {
+    window.location.reload();
+  }, 500);
+}
+
+function executeLogAction(action) {
+  var actionText = '';
+  switch(action) {
+    case 'clearlog': actionText = '清空日志'; break;
+    case 'cleanup_log': actionText = '智能清理'; break;
+  }
+  
+  if (confirm('确定要' + actionText + '吗？')) {
+    // 显示加载状态
+    var logContent = document.getElementById('logContent');
+    logContent.innerHTML = '<span style="color:#6c757d;">正在' + actionText + '...</span>';
+    
+    // 执行操作
+    var url = new URL(window.location);
+    url.searchParams.set('cmd', action);
+    
+    fetch(url.toString())
+      .then(function(response) {
+        return response.text();
+      })
+      .then(function(data) {
+        // 操作完成后刷新日志
+        setTimeout(function() {
+          window.location.reload();
+        }, 1000);
+      })
+      .catch(function(error) {
+        logContent.innerHTML = '<span style="color:#dc3545;">操作失败: ' + error + '</span>';
+      });
+  }
+}
+
+// 点击模态框外部关闭
+window.onclick = function(event) {
+  var logModal = document.getElementById('logModal');
+  if (event.target == logModal) {
+    closeLogViewer();
+  }
+}
+
+// ESC键关闭模态框
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'Escape') {
+    closeLogViewer();
+  }
+});
 </script>
 </body>
 </html>
@@ -635,6 +1006,91 @@ if ($cmd === 'start_download') {
   } else {
     echo '未知的下载目标';
   }
+  exit;
+}
+if ($cmd === 'dashboard_status') {
+  // 返回JSON格式的仪表板数据
+  header('Content-Type: application/json; charset=utf-8');
+  
+  // 获取mihomo状态
+  $status = shell_exec("bash $scripts/status.sh 2>&1");
+  $version = shell_exec("bash $scripts/version.sh 2>&1");
+  
+  $isRunning = strpos($status, 'running') !== false;
+  $pid = '';
+  if (preg_match('/pid=(\d+)/', $status, $matches)) {
+    $pid = $matches[1];
+  }
+  
+  // 获取内存使用信息
+  $memoryUsage = '0 MB';
+  if ($pid) {
+    $memoryInfo = shell_exec("ps -o rss= -p $pid 2>/dev/null");
+    if ($memoryInfo) {
+      $memoryKB = intval(trim($memoryInfo));
+      $memoryMB = round($memoryKB / 1024, 1);
+      $memoryUsage = $memoryMB . ' MB';
+    }
+  }
+  
+  // 获取运行时间信息
+  $uptime = '未知';
+  if ($pid) {
+    $startTime = shell_exec("ps -o lstart= -p $pid 2>/dev/null");
+    if ($startTime) {
+      $startTimestamp = strtotime(trim($startTime));
+      if ($startTimestamp) {
+        $currentTime = time();
+        $diff = $currentTime - $startTimestamp;
+        
+        $hours = floor($diff / 3600);
+        $minutes = floor(($diff % 3600) / 60);
+        
+        if ($hours > 0) {
+          $uptime = $hours . 'h' . $minutes . 'm';
+        } else {
+          $uptime = $minutes . 'm';
+        }
+      }
+    }
+  }
+  
+  // 获取配置信息
+  $confDir = '/boot/config/plugins/easy-mihomo';
+  $selectFile = $confDir . '/selected.conf';
+  $selectedName = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
+  $selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($confDir . '/' . $selectedName) : '';
+  
+  $result = [
+    'running' => $isRunning,
+    'status' => trim($status),
+    'version' => trim($version),
+    'pid' => $pid,
+    'memory' => $memoryUsage,
+    'uptime' => $uptime,
+    'config' => [
+      'selected_config' => $selectedName,
+      'config_path' => $selectedPath,
+      'has_config' => !empty($selectedPath)
+    ]
+  ];
+  
+  echo json_encode($result);
+  exit;
+}
+if ($cmd === 'start') {
+  $out = shell_exec("bash $scripts/start.sh 2>&1");
+  echo htmlspecialchars($out ?? '');
+  exit;
+}
+if ($cmd === 'stop') {
+  $out = shell_exec("bash $scripts/stop.sh 2>&1");
+  echo htmlspecialchars($out ?? '');
+  exit;
+}
+if ($cmd === 'restart') {
+  $out = shell_exec("bash $scripts/restart.sh 2>&1");
+  echo htmlspecialchars($out ?? '');
   exit;
 }
 echo 'unknown command';
@@ -750,19 +1206,35 @@ fi
 
 # 检查并修复配置文件中的UI路径
 if [ -f "$CONF_FILE" ]; then
-  echo "检查配置文件UI路径..." >> "$LOG_FILE" 2>&1
-  CURRENT_UI_PATH=$(grep "^external-ui:" "$CONF_FILE" | head -1 | sed 's/.*external-ui: *//' | tr -d ' ' || echo "")
-  
-  if [[ "$CURRENT_UI_PATH" != "ui" ]]; then
-    echo "检测到UI路径为: $CURRENT_UI_PATH，修改为: ui" >> "$LOG_FILE" 2>&1
-    # 备份原配置
-    cp "$CONF_FILE" "$CONF_FILE.bak.$(date +%s)" 2>/dev/null || true
-    # 修改UI路径为ui
-    sed -i "s|^external-ui:.*|external-ui: ui|g" "$CONF_FILE"
-    echo "UI路径已修改为: ui" >> "$LOG_FILE" 2>&1
-  else
-    echo "UI路径正确: ui" >> "$LOG_FILE" 2>&1
-  fi
+  # 进行标准化处理前，备份一次配置（仅保留单个备份文件）
+  cp "$CONF_FILE" "$CONF_FILE.bak" 2>/dev/null || true
+
+  # 统一覆写关键UI/控制器字段，保障兼容
+  DESIRED_UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip"
+  DESIRED_UI_NAME="zashboard"
+  DESIRED_UI_PATH="ui"
+  DESIRED_CONTROLLER="0.0.0.0:9090"
+  DESIRED_SECRET="yyds666"
+
+  upsert_yaml_key(){
+    local key="$1"; shift
+    local val="$1"; shift
+    # 转义 / 和 &，避免 sed 替换冲突
+    local esc_val
+    esc_val=$(printf '%s' "$val" | sed 's/[&\/]/\\&/g')
+    if grep -qE "^${key}:" "$CONF_FILE"; then
+      sed -i "s|^${key}:.*|${key}: ${esc_val}|g" "$CONF_FILE"
+    else
+      echo "${key}: ${val}" >> "$CONF_FILE"
+    fi
+  }
+
+  echo "标准化 external-ui-url / external-ui-name / external-controller / secret..." >> "$LOG_FILE" 2>&1
+  upsert_yaml_key "external-ui-url" "$DESIRED_UI_URL"
+  upsert_yaml_key "external-ui-name" "$DESIRED_UI_NAME"
+  upsert_yaml_key "external-ui" "$DESIRED_UI_PATH"
+  upsert_yaml_key "external-controller" "$DESIRED_CONTROLLER"
+  upsert_yaml_key "secret" "$DESIRED_SECRET"
 else
   echo "配置文件不存在，跳过UI路径检查" >> "$LOG_FILE" 2>&1
 fi
@@ -1004,6 +1476,394 @@ Tabs="false"
 <?php
 include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
 ?>
+]]></INLINE>
+</FILE>
+
+<!-- Dashboard page content -->
+<FILE Name="/usr/local/emhttp/plugins/easy-mihomo/EasyMihomo.Dashboard.page">
+<INLINE><![CDATA[
+Menu="Dashboard:0"
+Icon="icon-network"
+Title="Mihomo Status"
+---
+<?php
+/*
+  MIT License
+
+  Copyright (c) 2024 Easy-Mihomo
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+*/
+
+require_once('/usr/local/emhttp/plugins/dynamix/include/Wrappers.php');
+$pluginname = "easy-mihomo";
+
+// 获取mihomo状态
+function getMihomoStatus() {
+    $status = shell_exec("bash /usr/local/emhttp/plugins/easy-mihomo/scripts/status.sh 2>&1");
+    $version = shell_exec("bash /usr/local/emhttp/plugins/easy-mihomo/scripts/version.sh 2>&1");
+    
+    $isRunning = strpos($status, 'running') !== false;
+    $pid = '';
+    if (preg_match('/pid=(\d+)/', $status, $matches)) {
+        $pid = $matches[1];
+    }
+    
+    return [
+        'running' => $isRunning,
+        'status' => trim($status),
+        'version' => trim($version),
+        'pid' => $pid
+    ];
+}
+
+// 获取配置信息
+function getMihomoConfig() {
+    $confDir = '/boot/config/plugins/easy-mihomo';
+    $selectFile = $confDir . '/selected.conf';
+    $selectedName = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
+    $selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($confDir . '/' . $selectedName) : '';
+    
+    return [
+        'selected_config' => $selectedName,
+        'config_path' => $selectedPath,
+        'has_config' => !empty($selectedPath)
+    ];
+}
+
+// 获取日志信息
+function getMihomoLogInfo() {
+    $logFile = '/var/log/mihomo.log';
+    $logSize = file_exists($logFile) ? filesize($logFile) : 0;
+    $logLines = file_exists($logFile) ? count(file($logFile)) : 0;
+    
+    function formatBytes($size, $precision = 2) {
+        $units = array('B', 'KB', 'MB', 'GB', 'TB');
+        for ($i = 0; $size > 1024 && $i < count($units) - 1; $i++) {
+            $size /= 1024;
+        }
+        return round($size, $precision) . ' ' . $units[$i];
+    }
+    
+    return [
+        'size' => formatBytes($logSize),
+        'lines' => $logLines,
+        'exists' => file_exists($logFile)
+    ];
+}
+
+$mihomoStatus = getMihomoStatus();
+$mihomoConfig = getMihomoConfig();
+$logInfo = getMihomoLogInfo();
+
+// 创建仪表板瓦片
+$mytiles[$pluginname]['column1'] =
+<<<EOT
+<tbody id="tblMihomoDash" title="_(Mihomo 代理状态)_">
+<tr>
+    <td>
+        <span class='tile-header'>
+        <span class='tile-header-left'>
+            <i class='icon-network f32'></i>
+            <div class='section'>
+                <span class='mihomo-status'>
+                    <i class='fa fa-circle mihomo-status-icon'></i>
+                    <span class='mihomo-status-text'>_(状态: 加载中...)_</span>
+                </span>
+                <span class='mihomo-version' id='mihomo-version'>_(版本: 加载中...)_</span>
+            </div>
+        </span>
+        <span class='tile-header-right'>
+            <span class='tile-header-right-controls'>
+            <a href="/Settings/EasyMihomo.Main" title="_(前往 Mihomo 设置)_">
+                <i class="fa fa-fw fa-cog control"></i>
+            </a>
+            </span>
+        </span>
+        </span>
+    </td>
+</tr>
+<tr class="header"><td><span class="w25">_(运行状态)_</span><span class="w25">_(配置文件)_</span><span class="w25">_(内存使用)_</span><span class="w25">_(运行时间)_</span></td></tr>
+<tr class="updated">
+    <td>
+        <span class="w25">
+            <span class="mihomo-service-status">_(加载中...)_</span>
+        </span>
+        <span class="w25">
+            <span class="mihomo-config-info">_(加载中...)_</span>
+        </span>
+        <span class="w25">
+            <span class="mihomo-memory-info">_(加载中...)_</span>
+        </span>
+        <span class="w25">
+            <span class="mihomo-uptime-info">_(加载中...)_</span>
+        </span>
+    </td>
+</tr>
+<tr class="updated">
+    <td>
+        <span class="w25">
+            <button class="mihomo-btn mihomo-btn-start" onclick="mihomoAction('start')" title="_(启动 Mihomo 服务)_">
+                <i class="fa fa-play"></i> _(启动)_
+            </button>
+        </span>
+        <span class="w25">
+            <button class="mihomo-btn mihomo-btn-restart" onclick="mihomoAction('restart')" title="_(重启 Mihomo 服务)_">
+                <i class="fa fa-refresh"></i> _(重启)_
+            </button>
+        </span>
+        <span class="w25">
+            <button class="mihomo-btn mihomo-btn-stop" onclick="mihomoAction('stop')" title="_(停止 Mihomo 服务)_">
+                <i class="fa fa-stop"></i> _(停止)_
+            </button>
+        </span>
+        <span class="w25">
+            <button class="mihomo-btn mihomo-btn-ui" onclick="mihomoAction('ui')" title="_(打开 Mihomo 管理界面)_">
+                <i class="fa fa-external-link"></i> _(打开UI)_
+            </button>
+        </span>
+    </td>
+</tr>
+<tr><td><span></span></td></tr>
+</tbody>
+EOT;
+
+?>
+<style type="text/css">
+.mihomo-status {
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.mihomo-status-icon {
+    margin-right: 5px;
+}
+
+.mihomo-status-icon.running {
+    color: #28a745;
+}
+
+.mihomo-status-icon.stopped {
+    color: #dc3545;
+}
+
+.mihomo-status-icon.loading {
+    color: #6c757d;
+}
+
+.mihomo-version {
+    display: block;
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 2px;
+}
+
+.mihomo-service-status {
+    font-weight: bold;
+}
+
+.mihomo-config-info {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.mihomo-memory-info {
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: bold;
+}
+
+.mihomo-uptime-info {
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: bold;
+}
+
+/* 确保4列等宽对齐 */
+.w25 {
+    width: 25% !important;
+    display: inline-block;
+    text-align: center;
+    vertical-align: top;
+    box-sizing: border-box;
+    padding: 0 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 按钮样式 */
+.mihomo-btn {
+    background: #2c3e50;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    width: 100%;
+    max-width: 80px;
+    margin: 2px;
+}
+
+.mihomo-btn:hover {
+    opacity: 0.8;
+    transform: translateY(-1px);
+}
+
+.mihomo-btn:active {
+    transform: translateY(0);
+}
+
+.mihomo-btn i {
+    margin-right: 4px;
+}
+
+.mihomo-btn-start {
+    background: #28a745;
+}
+
+.mihomo-btn-restart {
+    background: #ffc107;
+    color: #212529;
+}
+
+.mihomo-btn-stop {
+    background: #dc3545;
+}
+
+.mihomo-btn-ui {
+    background: #17a2b8;
+}
+
+</style>
+
+<script type="text/javascript" src="/plugins/easy-mihomo/scripts/mihomo-dashboard.js"></script>
+<script type="text/javascript">
+function refreshMihomoDashboard() {
+    $.getJSON('/plugins/easy-mihomo/api.php?cmd=dashboard_status', function(data) {
+        if (data) {
+            // 更新状态显示
+            var statusIcon = $('.mihomo-status-icon');
+            var statusText = $('.mihomo-status-text');
+            var versionText = $('#mihomo-version');
+            var serviceStatus = $('.mihomo-service-status');
+            var configInfo = $('.mihomo-config-info');
+            var memoryInfo = $('.mihomo-memory-info');
+            var uptimeInfo = $('.mihomo-uptime-info');
+            
+            // 状态图标和文本
+            statusIcon.removeClass('running stopped loading').addClass(data.running ? 'running' : 'stopped');
+            statusText.text(data.running ? _('运行中') : _('已停止'));
+            
+            // 顶部版本信息
+            versionText.text(_('版本: ') + (data.version || _('未知')));
+            
+            // 运行状态
+            if (data.running) {
+                serviceStatus.html('<span style="color:#28a745;font-weight:bold;">' + _('运行中') + '</span>');
+            } else {
+                serviceStatus.html('<span style="color:#dc3545;font-weight:bold;">' + _('已停止') + '</span>');
+            }
+            
+            // 配置文件信息
+            if (data.config && data.config.has_config) {
+                var configName = data.config.selected_config || _('未知');
+                configInfo.html('<span style="color:#28a745;">' + configName + '</span>');
+            } else {
+                configInfo.html('<span style="color:#dc3545;">' + _('未选择配置') + '</span>');
+            }
+            
+            // 内存使用信息
+            if (data.running && data.memory) {
+                memoryInfo.html('<span style="color:#17a2b8;">' + data.memory + '</span>');
+            } else {
+                memoryInfo.html('<span style="color:#6c757d;">' + _('未知') + '</span>');
+            }
+            
+            // 运行时间信息
+            if (data.running && data.uptime) {
+                uptimeInfo.html('<span style="color:#28a745;">' + data.uptime + '</span>');
+            } else {
+                uptimeInfo.html('<span style="color:#6c757d;">' + _('未知') + '</span>');
+            }
+        }
+    }).fail(function() {
+        // 更新失败时的显示
+        $('.mihomo-status-icon').removeClass('running stopped').addClass('loading');
+        $('.mihomo-status-text').text(_('状态: 错误'));
+        $('.mihomo-service-status').text(_('错误'));
+        $('.mihomo-config-info').text(_('错误'));
+        $('.mihomo-memory-info').text(_('错误'));
+        $('.mihomo-uptime-info').text(_('错误'));
+    });
+}
+
+// 按钮操作函数
+function mihomoAction(action) {
+    switch(action) {
+        case 'start':
+        case 'stop':
+        case 'restart':
+            // 静默处理操作，不跳转页面
+            var actionText = '';
+            switch(action) {
+                case 'start': actionText = _('启动'); break;
+                case 'stop': actionText = _('停止'); break;
+                case 'restart': actionText = _('重启'); break;
+            }
+            
+            // 显示操作状态
+            $('.mihomo-status-text').text(_('状态: ') + actionText + _('中...'));
+            $('.mihomo-status-icon').removeClass('running stopped').addClass('loading');
+            
+            // 发送操作请求
+            $.get('/plugins/easy-mihomo/api.php?cmd=' + action, function(response) {
+                // 操作完成后刷新状态
+                setTimeout(function() {
+                    refreshMihomoDashboard();
+                }, 1000);
+            }).fail(function() {
+                // 操作失败时显示错误
+                $('.mihomo-status-text').text(_('状态: 操作失败'));
+                $('.mihomo-status-icon').removeClass('running stopped loading').addClass('stopped');
+            });
+            break;
+        case 'ui':
+            // 打开控制台UI
+            var currentHostname = window.location.hostname;
+            var consoleUrl = 'http://' + currentHostname + ':9090/ui/zashboard/#/proxies';
+            window.open(consoleUrl, '_blank');
+            break;
+    }
+}
+
+// 页面加载时立即刷新一次
+$(document).ready(function() {
+    refreshMihomoDashboard();
+    
+    // 每5秒刷新一次
+    setInterval(refreshMihomoDashboard, 5000);
+});
+</script>
 ]]></INLINE>
 </FILE>
 
