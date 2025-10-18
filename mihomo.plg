@@ -1484,7 +1484,6 @@ include '/usr/local/emhttp/plugins/easy-mihomo/index.php';
 <INLINE><![CDATA[
 Menu="Dashboard:0"
 Icon="icon-network"
-Title="Mihomo Status"
 ---
 <?php
 /*
