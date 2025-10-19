@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "easy-mihomo">
 <!ENTITY author    "隔壁小王">
-<!ENTITY version   "1.0.2">
+<!ENTITY version   "1.0.3">
 <!ENTITY launch    "Settings/EasyMihomo.Main">
 <!ENTITY sourceDir "/boot/config/plugins/easy-mihomo">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/wlaosj/easy-mihomo/refs/heads/main/mihomo.plg">
@@ -14,11 +14,19 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="6.12.0" support="https://t.me/+7jcTMePlNVwwZjg1" icon="icon-network">
 
 <CHANGES>
+1.0.3  配置管理优化版
+- 优化：简化配置覆写逻辑，只覆写UI相关配置项（external-ui-url/name、external-ui）
+- 优化：端口和密码信息从配置文件动态读取，支持用户自定义配置
+- 优化：页面显示信息与实际配置完全一致，提升用户体验
+- 优化：仪表板和控制台链接使用动态端口，支持自定义端口配置
+- 优化：减少不必要的配置干预，给用户更多配置灵活性
+- 修复：确保配置修改后页面显示立即反映变化
+
 1.0.2  功能与体验更新
 - 修复：配置编辑器保存不生效（提前初始化已选配置并在保存时防御性回读）
 - 优化：启动时统一标准化关键配置项（external-ui-url/name、external-ui、external-controller、secret），自动覆写或追加以提升兼容性
 - 清理：移除重复 external-ui 覆写，合并为一次备份+统一 upsert
-- 体验：在“打开控制台”后新增主机/端口/密码行内提示（主机自动取当前内网IP，端口9090，密码yyds666）
+- 体验：在"打开控制台"后新增主机/端口/密码行内提示（主机自动取当前内网IP，端口9090，密码yyds666）
 - 新增：仪表板显示模块（自动5秒刷新状态/版本/配置/内存/运行时间，含快捷操作）
 
 1.0.1  日志管理增强版
@@ -460,7 +468,7 @@ if ($cmd === 'saveconf') {
   } else if (strlen($content) > $maxSize) {
     $msg = '内容过大（>1MB）';
   } else {
-    // 防御性：若上方未读取到，命令阶段再次解析一次
+    // 防御性：若下方未读取到，命令阶段再次解析一次
     if (!$selectedPath) {
       $selectedNameCmd = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
       $selectedPath = ($selectedNameCmd && is_file($confDir . '/' . $selectedNameCmd)) ? ($confDir . '/' . $selectedNameCmd) : '';
@@ -498,6 +506,34 @@ function formatBytes($size, $precision = 2) {
         $size /= 1024;
     }
     return round($size, $precision) . ' ' . $units[$i];
+}
+
+// 从配置文件中解析端口和密码信息
+function getMihomoConfigValues($configPath) {
+    if (!file_exists($configPath)) {
+        return ['controller' => null, 'secret' => null, 'port' => null];
+    }
+    
+    $content = file_get_contents($configPath);
+    $controller = null;
+    $secret = null;
+    $port = null;
+    
+    // 解析 external-controller
+    if (preg_match('/external-controller:\s*(.+)/', $content, $matches)) {
+        $controller = trim($matches[1]);
+        // 从controller中提取端口
+        if (strpos($controller, ':') !== false) {
+            $port = explode(':', $controller)[1] ?? null;
+        }
+    }
+    
+    // 解析 secret
+    if (preg_match('/secret:\s*(.+)/', $content, $matches)) {
+        $secret = trim($matches[1]);
+    }
+    
+    return ['controller' => $controller, 'secret' => $secret, 'port' => $port];
 }
 
 // 处理上传重定向返回的消息
@@ -572,6 +608,12 @@ $selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($c
 // 读取配置内容用于编辑
 $confText = ($selectedPath && file_exists($selectedPath)) ? @file_get_contents($selectedPath) : '';
 
+// 解析配置文件中的端口和密码信息
+$configValues = getMihomoConfigValues($selectedPath);
+$controller = $configValues['controller'];
+$secret = $configValues['secret'];
+$port = $configValues['port'];
+
 // 检查安装状态
 $installStatus = '';
 $binExists = file_exists('/usr/local/bin/mihomo');
@@ -593,9 +635,9 @@ if (is_dir($confDir)) {
 
 // 只检查核心组件，配置文件由用户自己上传
 if (!$binExists) {
-  $installStatus = '<div class="error">❌ 缺少二进制文件，请点击上方“下载/更新核心”按钮安装</div>';
+  $installStatus = '<div class="error">❌ 缺少二进制文件，请点击下方“下载/更新核心”按钮安装</div>';
 } elseif (!$uiExists) {
-  $installStatus = '<div class="warning">⚠️ 未检测到 UI 压缩包，请点击上方“下载/更新UI”获取（不影响按配置自定义 external-ui）</div>';
+  $installStatus = '<div class="warning">⚠️ 未检测到 UI 压缩包，请点击下方“下载/更新UI”获取（不影响按配置自定义 external-ui）</div>';
 } elseif (!$confExists) {
   $installStatus = '<div class="success">💡 尚未发现配置文件，请上传到插件目录，或使用下方“打开文件管理器”</div>';
 }
@@ -626,7 +668,43 @@ function executeAction(action) {
 function openConsole() {
   // 获取当前页面的主机名（不包含端口）
   var currentHostname = window.location.hostname;
-  var consoleUrl = 'http://' + currentHostname + ':9090/ui/zashboard/#/proxies';
+  // 从页面中获取动态端口信息
+  var portSpans = document.querySelectorAll('span');
+  var port = null;
+  for (var i = 0; i < portSpans.length; i++) {
+    if (portSpans[i].textContent === '端口：') {
+      var nextSpan = portSpans[i].nextElementSibling;
+      if (nextSpan && nextSpan.tagName === 'SPAN') {
+        var portText = nextSpan.textContent.trim();
+        // 检查是否包含"未设置"文本（处理嵌套span的情况）
+        if (portText && portText !== '未设置' && !portText.includes('未设置')) {
+          port = portText;
+        }
+        break;
+      }
+    }
+  }
+  
+  // 如果没找到端口，尝试通过更简单的方法获取
+  if (!port) {
+    // 查找包含端口号的span元素
+    var allSpans = document.querySelectorAll('span');
+    for (var j = 0; j < allSpans.length; j++) {
+      var text = allSpans[j].textContent.trim();
+      // 检查是否是纯数字（端口号）
+      if (/^\d+$/.test(text) && parseInt(text) > 0 && parseInt(text) < 65536) {
+        port = text;
+        break;
+      }
+    }
+  }
+  
+  if (!port) {
+    alert('请在配置文件中设置 external-controller 端口');
+    return;
+  }
+  
+  var consoleUrl = 'http://' + currentHostname + ':' + port + '/ui/zashboard/#/proxies';
   // 在新标签页中打开控制台
   window.open(consoleUrl, '_blank');
 }
@@ -720,7 +798,15 @@ document.addEventListener('keydown', function(event) {
 </script>
 </head>
 <body>
-<h2>Mihomo 管理</h2>
+<h2 style="display:inline;">Mihomo 管理</h2>
+<div style="display:inline-block;margin-left:12px;vertical-align:middle;">
+  <a href="https://t.me/+7jcTMePlNVwwZjg1" target="_blank" style="display:inline-block;background:#0088cc;color:white;padding:4px 8px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:12px;margin-right:8px;">
+    📱 电报群交流
+  </a>
+  <span style="font-size:12px;color:#6c757d;">
+    Easy-Mihomo 插件 | 作者：隔壁小王 | 核心：Mihomo | UI：Zashboard
+  </span>
+</div>
 <?php if ($installStatus) { echo $installStatus; } ?>
 <div class="card">
   <div>
@@ -749,6 +835,9 @@ document.addEventListener('keydown', function(event) {
       <span style="color:#dc3545">未安装</span> | <button onclick="startDownload('core', this)">下载/更新核心</button>
     <?php endif; ?>
     <div id="progress-core" style="font-size:12px;color:#6c757d;margin-top:4px"></div>
+    <div style="margin-top:4px;font-size:12px;color:#6c757d;">
+      💡 <strong>手动安装：</strong>将 mihomo 二进制文件放到 <code>/boot/config/plugins/easy-mihomo/mihomo</code>，插件会自动识别并复制到内存
+    </div>
   </div>
 
   <div style="margin-top:6px">
@@ -762,10 +851,13 @@ document.addEventListener('keydown', function(event) {
     | <button onclick="openConsole()">打开控制台</button>
     <span style="margin-left:8px;color:#6c757d;white-space:nowrap;">
       主机：<span id="zash-host">-</span>
-      | 端口：<span>9090</span>
-      | 密码：<span>yyds666</span>
+      | 端口：<span><?= $port ? htmlspecialchars($port) : '<span style="color:#dc3545;">未设置</span>' ?></span>
+      | 密码：<span><?= $secret ? htmlspecialchars($secret) : '<span style="color:#dc3545;">未设置</span>' ?></span>
     </span>
     <div id="progress-ui" style="font-size:12px;color:#6c757d;margin-top:4px"></div>
+    <div style="margin-top:4px;font-size:12px;color:#6c757d;">
+      💡 <strong>手动安装：</strong>下载 zashboard 的 dist.zip，重命名为 <code>zashboard.zip</code> 放到 <code>/boot/config/plugins/easy-mihomo/zashboard.zip</code>
+    </div>
   </div>
 
   <div style="margin-top:6px">
@@ -784,6 +876,9 @@ document.addEventListener('keydown', function(event) {
      <button onclick="document.getElementById('configForm').submit()">刷新配置列表</button>
      | <button onclick="openFileManager()">打开配置文件夹</button>
      | <span style="color:#6c757d">当前：<?= $selectedPath ? htmlspecialchars($selectedPath) : '未选择' ?></span>
+    <div style="margin-top:4px;font-size:12px;color:#6c757d;">
+      💡 <strong>手动安装：</strong>将 .yaml 或 .yml 配置文件放到 <code>/boot/config/plugins/easy-mihomo/</code> 目录，然后刷新配置列表
+    </div>
   </div>
 
   <div style="margin-top:8px">
@@ -984,6 +1079,34 @@ $scripts = $baseRun . '/scripts';
 $progressDir = '/var/tmp/easy-mihomo-progress';
 @mkdir($progressDir, 0777, true);
 
+// 从配置文件中解析端口和密码信息
+function getMihomoConfigValues($configPath) {
+    if (!file_exists($configPath)) {
+        return ['controller' => null, 'secret' => null, 'port' => null];
+    }
+    
+    $content = file_get_contents($configPath);
+    $controller = null;
+    $secret = null;
+    $port = null;
+    
+    // 解析 external-controller
+    if (preg_match('/external-controller:\s*(.+)/', $content, $matches)) {
+        $controller = trim($matches[1]);
+        // 从controller中提取端口
+        if (strpos($controller, ':') !== false) {
+            $port = explode(':', $controller)[1] ?? null;
+        }
+    }
+    
+    // 解析 secret
+    if (preg_match('/secret:\s*(.+)/', $content, $matches)) {
+        $secret = trim($matches[1]);
+    }
+    
+    return ['controller' => $controller, 'secret' => $secret, 'port' => $port];
+}
+
 $cmd = $_GET['cmd'] ?? $_POST['cmd'] ?? '';
 if ($cmd === 'get_progress') {
   $target = $_GET['target'] ?? $_POST['target'] ?? '';
@@ -1061,6 +1184,12 @@ if ($cmd === 'dashboard_status') {
   $selectedName = is_file($selectFile) ? trim(@file_get_contents($selectFile)) : '';
   $selectedPath = ($selectedName && is_file($confDir . '/' . $selectedName)) ? ($confDir . '/' . $selectedName) : '';
   
+  // 解析配置文件中的端口和密码信息
+  $configValues = getMihomoConfigValues($selectedPath);
+  $controller = $configValues['controller'];
+  $secret = $configValues['secret'];
+  $port = $configValues['port'];
+  
   $result = [
     'running' => $isRunning,
     'status' => trim($status),
@@ -1071,7 +1200,10 @@ if ($cmd === 'dashboard_status') {
     'config' => [
       'selected_config' => $selectedName,
       'config_path' => $selectedPath,
-      'has_config' => !empty($selectedPath)
+      'has_config' => !empty($selectedPath),
+      'controller' => $controller,
+      'secret' => $secret,
+      'port' => $port
     ]
   ];
   
@@ -1209,12 +1341,10 @@ if [ -f "$CONF_FILE" ]; then
   # 进行标准化处理前，备份一次配置（仅保留单个备份文件）
   cp "$CONF_FILE" "$CONF_FILE.bak" 2>/dev/null || true
 
-  # 统一覆写关键UI/控制器字段，保障兼容
+  # 只覆写UI相关配置项，保障UI功能正常
   DESIRED_UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip"
   DESIRED_UI_NAME="zashboard"
   DESIRED_UI_PATH="ui"
-  DESIRED_CONTROLLER="0.0.0.0:9090"
-  DESIRED_SECRET="yyds666"
 
   upsert_yaml_key(){
     local key="$1"; shift
@@ -1229,12 +1359,10 @@ if [ -f "$CONF_FILE" ]; then
     fi
   }
 
-  echo "标准化 external-ui-url / external-ui-name / external-controller / secret..." >> "$LOG_FILE" 2>&1
+  echo "标准化UI配置项（external-ui-url / external-ui-name / external-ui）..." >> "$LOG_FILE" 2>&1
   upsert_yaml_key "external-ui-url" "$DESIRED_UI_URL"
   upsert_yaml_key "external-ui-name" "$DESIRED_UI_NAME"
   upsert_yaml_key "external-ui" "$DESIRED_UI_PATH"
-  upsert_yaml_key "external-controller" "$DESIRED_CONTROLLER"
-  upsert_yaml_key "secret" "$DESIRED_SECRET"
 else
   echo "配置文件不存在，跳过UI路径检查" >> "$LOG_FILE" 2>&1
 fi
@@ -1760,6 +1888,9 @@ EOT;
 function refreshMihomoDashboard() {
     $.getJSON('/plugins/easy-mihomo/api.php?cmd=dashboard_status', function(data) {
         if (data) {
+            // 保存API数据到全局变量，供其他函数使用
+            window.mihomoLastData = data;
+            
             // 更新状态显示
             var statusIcon = $('.mihomo-status-icon');
             var statusText = $('.mihomo-status-text');
@@ -1849,7 +1980,18 @@ function mihomoAction(action) {
         case 'ui':
             // 打开控制台UI
             var currentHostname = window.location.hostname;
-            var consoleUrl = 'http://' + currentHostname + ':9090/ui/zashboard/#/proxies';
+            // 从API数据中获取端口信息
+            var port = null;
+            if (window.mihomoLastData && window.mihomoLastData.config && window.mihomoLastData.config.port) {
+                port = window.mihomoLastData.config.port;
+            }
+            
+            if (!port) {
+                alert('请在配置文件中设置 external-controller 端口');
+                return;
+            }
+            
+            var consoleUrl = 'http://' + currentHostname + ':' + port + '/ui/zashboard/#/proxies';
             window.open(consoleUrl, '_blank');
             break;
     }
