@@ -38,6 +38,24 @@
    ```
 4. 点击 **"Install"** 开始安装
 
+## 飞牛NAS安装方法
+
+### 通过离线安装包安装
+
+1. 下载离线安装包：
+   - 直接下载：[easy-mihomo-2025.11.11.fpk](https://raw.githubusercontent.com/wlaosj/easy-mihomo/main/easy-mihomo-2025.11.11.fpk)
+   - 或访问 [GitHub 仓库](https://github.com/wlaosj/easy-mihomo/blob/main/easy-mihomo-2025.11.11.fpk) 下载
+
+2. 在飞牛NAS中安装：
+   - 打开飞牛NAS的应用中心
+   - 点击 **"离线安装"** 或 **"本地安装"**
+   - 选择下载的 `easy-mihomo-2025.11.11.fpk` 文件
+   - 点击 **"安装"** 开始安装
+
+3. 安装完成后：
+   - 在应用中心找到 **Easy-Mihomo** 应用
+   - 点击打开应用，首次使用需要进行 B站粉丝验证
+   - 输入您的 B站 MID 并完成验证后即可使用
 
 ## 使用指南
 
