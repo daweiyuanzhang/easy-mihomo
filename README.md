@@ -42,7 +42,7 @@
 ### 通过离线安装包安装
 
 1. 下载离线安装包：
-   - [点击加入]([https://t.me/+7jcTMePlNVwwZjg1](https://github.com/wlaosj/easy-mihomo/releases)) - 获取插件安装包
+   - [点击加入]([https://github.com/wlaosj/easy-mihomo/releases) - 获取插件安装包
 
 2. 在飞牛NAS中安装：
    - 打开飞牛NAS的应用中心
