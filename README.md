@@ -1,12 +1,11 @@
-# Easy-Mihomo for Unraid
+# Easy-Mihomo for Unraid and fnos
 
-一个为 Unraid 系统设计的 Mihomo 代理客户端插件（飞牛nas应用正在折腾中），提供简单易用的 Web 管理界面。
+一个为 Unraid和fnos系统设计的 Mihomo Web 管理插件。
 
 ## 技术支持
 
 - **Telegram 群组**：[点击加入](https://t.me/+7jcTMePlNVwwZjg1) - 获取配置文件模板
-- **爱发电主页**：[https://afdian.com/a/docker](https://afdian.com/a/docker) - 支持作者
-- **GitHub 主页**：[https://github.com/wlaosj](https://github.com/wlaosj) - 更多插件
+- **GitHub 主页**：[点击跳转](https://github.com/wlaosj) - 更多插件
 
 ## 功能特点
 
@@ -26,9 +25,9 @@
 - Unraid 6.12.0 或更高版本
 - 至少 50MB 可用空间
 
-## 安装方法
+## unraid安装方法
 
-### 方法一：通过 URL 安装（推荐）
+### 通过 URL 安装
 
 1. 在 Unraid Web 界面进入 **Plugins** 页面
 2. 点击 **"Install Plugin"**
@@ -43,19 +42,16 @@
 ### 通过离线安装包安装
 
 1. 下载离线安装包：
-   - 直接下载：[easy-mihomo-2025.11.11.fpk](https://raw.githubusercontent.com/wlaosj/easy-mihomo/main/easy-mihomo-2025.11.11.fpk)
-   - 或访问 [GitHub 仓库](https://github.com/wlaosj/easy-mihomo/blob/main/easy-mihomo-2025.11.11.fpk) 下载
+   - [点击跳转](https://github.com/wlaosj/easy-mihomo/releases) - 获取插件安装包
 
 2. 在飞牛NAS中安装：
    - 打开飞牛NAS的应用中心
    - 点击 **"离线安装"** 或 **"本地安装"**
-   - 选择下载的 `easy-mihomo-2025.11.11.fpk` 文件
+   - 选择下载的 `easy-mihomo-fnos` 文件
    - 点击 **"安装"** 开始安装
 
 3. 安装完成后：
    - 在应用中心找到 **Easy-Mihomo** 应用
-   - 点击打开应用，首次使用需要进行 B站粉丝验证
-   - 输入您的 B站 MID 并完成验证后即可使用
 
 ## 使用指南
 
@@ -148,60 +144,9 @@
 2. 点击 **"Remove"** 按钮
 3. 确认卸载，所有相关文件将被清理
 
-## 技术支持
-
-## 更新日志
-
-### v1.1.0 (2025-11-06)
-- ⭐ 核心与UI自动检测更新，一键升级
-- ⭐ 支持3种CPU架构：标准版/兼容版/v3优化版
-- ⭐ 智能下载管理：自动重试、进度显示、错误提示
-- 核心显示实际安装的版本类型（如 1.19.15 [v3优化版]）
-- 支持服务运行时下载核心（重启后生效）
-- 日志自动清理：每6小时检查，超过2MB保留最近1000行
-- 界面布局优化：操作更流畅，信息更清晰
-
-### v1.0.3
-- 优化：简化配置覆写逻辑，只覆写UI相关配置项（external-ui-url/name、external-ui）
-- 优化：端口和密码信息从配置文件动态读取，支持用户自定义配置
-- 优化：页面显示信息与实际配置完全一致，提升用户体验
-- 优化：仪表板和控制台链接使用动态端口，支持自定义端口配置
-- 优化：减少不必要的配置干预，给用户更多配置灵活性
-- 修复：确保配置修改后页面显示立即反映变化
-
-### v1.0.2
-- 修复：弹出式配置编辑器保存后未生效的问题（提前初始化所选配置并在保存时做防御性回读）。
-- 优化：启动时统一标准化关键配置项（`external-ui-url`/`external-ui-name`/`external-ui`、`external-controller`、`secret`），自动覆写或追加以提升兼容性。
-- 清理：移除重复的 `external-ui` 覆写逻辑，合并为一次性备份+统一 upsert 的做法，提升可维护性。
-- 体验：在“打开控制台”按钮后新增行内提示（主机/端口/密码），主机自动填充当前 Unraid 内网主机名；端口固定 `9090`，密码固定 `yyds666`。
-- 新增：仪表板显示模块（Dashboard Tile），自动每5秒刷新，展示运行状态、版本、当前配置、内存占用与运行时间，并提供启动/重启/停止/打开UI的快捷按钮。
-
-### v1.0.1
-- 新增自动日志清理功能
-- 支持定期清理（每天凌晨2点）
-- 智能保留最近1000行日志
-- 添加日志状态监控显示
-- 新增手动智能清理按钮
-- 优化日志文件大小管理
-- 改进配置选择体验，支持自动保存
-- 新增弹出式配置编辑器，提供更大编辑空间
-- 优化界面布局，操作按钮更合理
-- 改进下载进度显示，支持自动消失提示
-- 更新核心版本到 v1.19.15
-
-### v1.0.0
-- 初始版本发布
-- 支持基本的代理功能
-- 集成 Web 管理界面
-- 支持开机自启动
-- 支持多配置文件管理
-- 支持在线编辑配置
-- 内置 mihomo v1.19.14 核心
-
 ---
 
 **注意**：使用代理服务请遵守当地法律法规，本插件仅供学习和研究使用。
 
 ---
 
-💜 喜欢此插件？通过 [爱发电](https://afdian.com/a/docker) 支持作者 | 🔗 [GitHub 主页](https://github.com/wlaosj) 更多插件 | 📱 [Telegram 群组](https://t.me/+7jcTMePlNVwwZjg1) 获取配置
