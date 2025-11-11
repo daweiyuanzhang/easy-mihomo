@@ -5,7 +5,7 @@
 ## 技术支持
 
 - **Telegram 群组**：[点击加入](https://t.me/+7jcTMePlNVwwZjg1) - 获取配置文件模板
-- **GitHub 主页**：[https://github.com/wlaosj](https://github.com/wlaosj) - 更多插件
+- **GitHub 主页**：[点击跳转](https://github.com/wlaosj) - 更多插件
 
 ## 功能特点
 
@@ -42,7 +42,7 @@
 ### 通过离线安装包安装
 
 1. 下载离线安装包：
-   - [点击加入]([https://github.com/wlaosj/easy-mihomo/releases) - 获取插件安装包
+   - [点击跳转](https://github.com/wlaosj/easy-mihomo/releases) - 获取插件安装包
 
 2. 在飞牛NAS中安装：
    - 打开飞牛NAS的应用中心
