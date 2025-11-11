@@ -42,8 +42,7 @@
 ### 通过离线安装包安装
 
 1. 下载离线安装包：
-   - 直接下载：[easy-mihomo-2025.11.11.fpk](https://raw.githubusercontent.com/wlaosj/easy-mihomo/main/easy-mihomo-2025.11.11.fpk)
-   - 或访问 [GitHub 仓库](https://github.com/wlaosj/easy-mihomo/blob/main/easy-mihomo-2025.11.11.fpk) 下载
+   - [点击加入](https://t.me/+7jcTMePlNVwwZjg1) - 获取插件安装包
 
 2. 在飞牛NAS中安装：
    - 打开飞牛NAS的应用中心
