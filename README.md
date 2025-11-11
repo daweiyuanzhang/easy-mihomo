@@ -1,6 +1,6 @@
-# Easy-Mihomo for Unraid
+# Easy-Mihomo for Unraid and fnos
 
-一个为 Unraid 系统设计的 Mihomo 代理客户端插件（飞牛nas应用正在折腾中），提供简单易用的 Web 管理界面。
+一个为 Unraid和fnos系统设计的 Mihomo Web 管理插件。
 
 ## 技术支持
 
