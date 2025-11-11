@@ -25,9 +25,9 @@
 - Unraid 6.12.0 或更高版本
 - 至少 50MB 可用空间
 
-## 安装方法
+## unraid安装方法
 
-### 方法一：通过 URL 安装（推荐）
+### 通过 URL 安装
 
 1. 在 Unraid Web 界面进入 **Plugins** 页面
 2. 点击 **"Install Plugin"**
