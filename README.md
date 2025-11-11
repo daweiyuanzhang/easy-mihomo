@@ -152,4 +152,3 @@
 
 ---
 
-💜 喜欢此插件？通过 [爱发电](https://afdian.com/a/docker) 支持作者 | 🔗 [GitHub 主页](https://github.com/wlaosj) 更多插件 | 📱 [Telegram 群组](https://t.me/+7jcTMePlNVwwZjg1) 获取配置
